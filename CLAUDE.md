@@ -309,7 +309,7 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 1, Step 2 complete (2/35 steps, 6% complete)
+**Current Status**: Phase 1, Step 3 complete (3/35 steps, 9% complete)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -342,6 +342,21 @@ When working on this project:
 - Pydantic dataclasses for validation (not regular dataclasses)
 - Use `@field_validator` for single-field validation
 - Use `@model_validator(mode="after")` for cross-field validation
+- **Important**: pydantic's `EmailStr` type requires the `email-validator` package (install with `uv add email-validator`)
+
+### Default Values in Dataclasses
+- Use `field(default_factory=dict)` for mutable defaults (dict, list, set)
+- Use `field(default_factory=set)` for set defaults
+- Never use mutable objects as direct default values (e.g., `scores: dict = {}` is WRONG)
+- Example:
+  ```python
+  from dataclasses import dataclass, field
+
+  @dataclass
+  class Player:
+      daily_scores: dict[str, int] = field(default_factory=dict)
+      completed_days: set[str] = field(default_factory=set)
+  ```
 
 ### File Headers
 Every source file must start with:
@@ -356,6 +371,22 @@ Every source file must start with:
 - Don't test that Temporal SDK works correctly
 - Test your validation rules, business logic, and data transformations
 - Test directories do NOT have `__init__.py` files
+
+## Data Models Implemented
+
+### Question Model (`src/models/question.py`)
+- Validates A/B/C/D answer format (exactly 4 keys required)
+- Validates `correct_answer` is one of A, B, C, or D
+- Validates `correct_answer` exists as a key in options dict
+- Validates non-empty id and text fields
+- 96.88% test coverage (9 test cases)
+
+### Player Model (`src/models/player.py`)
+- Email validation using pydantic's `EmailStr` (requires `email-validator` package)
+- Display name formatting: `get_display_name()` returns "FirstName L." or just "FirstName" if last_name is empty
+- Default values for score tracking: `total_score=0`, `daily_scores={}`, `completed_days=set()`, `current_question_index={}`
+- Uses `field(default_factory=...)` for all mutable defaults
+- 100% test coverage (10 test cases)
 
 ## Reference Projects
 

@@ -25,11 +25,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 3: Core Data Models - Player
-- [ ] Write Player model tests (creation, display_name, email validation)
-- [ ] Implement Player dataclass with fields and defaults
-- [ ] Add get_display_name() method with "FirstName L." format
-- [ ] Refactor with helper methods if needed
-- [ ] Verify tests pass and run just check
+- [x] Write Player model tests (creation, display_name, email validation)
+- [x] Implement Player dataclass with fields and defaults
+- [x] Add get_display_name() method with "FirstName L." format
+- [x] Refactor with helper methods if needed
+- [x] Verify tests pass and run just check
 
 ### Step 4: Core Data Models - LeaderboardEntry and EventConfig
 - [ ] Write LeaderboardEntry tests
@@ -327,14 +327,14 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 ## Overall Progress
 
-**Phase 1: Project Foundation** - 2/4 steps complete (50%)
+**Phase 1: Project Foundation** - 3/4 steps complete (75%)
 **Phase 2: Configuration and Question Loading** - 0/4 steps complete (0%)
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 2/35 steps complete (6%)**
+**Total Progress: 3/35 steps complete (9%)**
 
 ---
 
