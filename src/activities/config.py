@@ -1,0 +1,130 @@
+# ABOUTME: Configuration loading activities for event setup.
+# Loads and validates TOML configuration files for trivia events.
+
+import tomllib
+from datetime import date, time
+from pathlib import Path
+
+from temporalio import activity
+
+from src.models.config import EventConfig
+
+
+class ConfigActivities:
+    """Activity class for configuration-related operations."""
+
+    @activity.defn
+    def load_event_config(self, config_path: str) -> EventConfig:
+        """Load and parse event configuration from TOML file.
+
+        Reads a TOML configuration file, extracts all required sections,
+        parses date/time strings, and creates an EventConfig instance.
+        Pydantic validation handles field validation automatically.
+
+        Args:
+            config_path: Path to the TOML configuration file
+
+        Returns:
+            EventConfig: Validated event configuration instance
+
+        Raises:
+            FileNotFoundError: If the configuration file does not exist
+            ValueError: If the TOML file is malformed or cannot be parsed
+            ValidationError: If required fields are missing or validation fails
+
+        Example:
+            >>> activities = ConfigActivities()
+            >>> config = activities.load_event_config("config/event.toml")
+            >>> print(config.start_date)
+            2025-03-10
+        """
+        # Check if file exists
+        config_file = Path(config_path)
+        if not config_file.exists():
+            raise FileNotFoundError(
+                f"Configuration file not found: {config_path}"
+            )
+
+        # Read and parse TOML file
+        try:
+            with open(config_file, "rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            raise ValueError(
+                f"Failed to parse TOML configuration file: {e}"
+            ) from e
+        except Exception as e:
+            raise ValueError(
+                f"Error reading configuration file: {e}"
+            ) from e
+
+        # Extract sections - provide helpful error messages for missing sections
+        try:
+            dates_section = data["dates"]
+        except KeyError as e:
+            raise ValueError(
+                "Missing required section '[dates]' in configuration file"
+            ) from e
+
+        try:
+            questions_section = data["questions"]
+        except KeyError as e:
+            raise ValueError(
+                "Missing required section '[questions]' in configuration file"
+            ) from e
+
+        try:
+            features_section = data["features"]
+        except KeyError as e:
+            raise ValueError(
+                "Missing required section '[features]' in configuration file"
+            ) from e
+
+        try:
+            s3_section = data["s3"]
+        except KeyError as e:
+            raise ValueError(
+                "Missing required section '[s3]' in configuration file"
+            ) from e
+
+        # Parse date strings to date objects (ISO format: YYYY-MM-DD)
+        try:
+            start_date = date.fromisoformat(dates_section["start_date"])
+            end_date = date.fromisoformat(dates_section["end_date"])
+        except KeyError as e:
+            raise ValueError(
+                f"Missing required date field in [dates] section: {e}"
+            ) from e
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid date format (expected YYYY-MM-DD): {e}"
+            ) from e
+
+        # Parse time strings to time objects (ISO format: HH:MM:SS)
+        try:
+            day_start_time = time.fromisoformat(dates_section["day_start_time"])
+            day_end_time = time.fromisoformat(dates_section["day_end_time"])
+        except KeyError as e:
+            raise ValueError(
+                f"Missing required time field in [dates] section: {e}"
+            ) from e
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid time format (expected HH:MM:SS): {e}"
+            ) from e
+
+        # Create and return EventConfig instance
+        # Pydantic validation will handle field validation
+        return EventConfig(
+            start_date=start_date,
+            end_date=end_date,
+            day_start_time=day_start_time,
+            day_end_time=day_end_time,
+            timezone=dates_section["timezone"],
+            questions_file_path=questions_section["file_path"],
+            questions_per_day=questions_section["per_day"],
+            show_correct_answer=features_section["show_correct_answer"],
+            require_work_email=features_section["require_work_email"],
+            s3_bucket_name=s3_section["bucket_name"],
+            s3_region=s3_section["region"],
+        )

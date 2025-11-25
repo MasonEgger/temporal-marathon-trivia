@@ -1,0 +1,13 @@
+# Test fixture: Config with missing required fields
+# Missing questions and features sections
+
+[dates]
+start_date = "2025-03-10"
+end_date = "2025-03-12"
+day_start_time = "09:00:00"
+day_end_time = "17:00:00"
+timezone = "America/Los_Angeles"
+
+[s3]
+bucket_name = "test-marathon-trivia"
+region = "us-west-2"

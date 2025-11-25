@@ -309,7 +309,9 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 1 complete - 4/4 steps (11% total progress, ready for Phase 2)
+**Current Status**: Phase 2 started - 5/35 steps complete (14% total progress)
+- Phase 1 (Project Foundation): 100% complete ✅
+- Phase 2 (Configuration and Question Loading): 25% complete (Step 5 done)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -407,6 +409,100 @@ Every source file must start with:
 - Helper method: `get_all_dates()` returns list[date] from start to end (inclusive)
 - 100% test coverage (9 test cases)
 - **Design Decision**: API/UI fields (title, description, colors, messages) will be added in Phase 4 when implementing the API layer. This follows TDD principles: only implement what's needed for the current phase.
+
+## Temporal Activity Implementation Patterns (CRITICAL)
+
+### Activity Best Practices
+
+**All activities MUST follow these patterns:**
+
+1. **Class-Based Implementation**
+   ```python
+   class ConfigActivities:
+       @activity.defn
+       def load_event_config(self, config_path: str) -> EventConfig:
+           # Implementation
+   ```
+   - Activities are implemented as **class methods**, not standalone functions
+   - Use `@activity.defn` decorator on the method
+   - Benefits: Can share state, inject dependencies, follows Temporal SDK patterns
+
+2. **When to Use `@activity.defn`**
+   - **File I/O** (reading, writing)
+   - **Network calls** (HTTP, database)
+   - **System calls** (time, random)
+   - **Any non-deterministic operation**
+   - **Reason**: Workflows must be deterministic for replay; activities are not
+
+3. **Synchronous vs Async**
+   - **Use `def` (synchronous)** when:
+     - Using blocking I/O libraries (`open()`, `tomllib`, etc.)
+     - No async version available
+     - Simple operations
+   - **Use `async def`** when:
+     - Using async I/O libraries (`aiofiles`, `httpx`, etc.)
+     - Need concurrent operations
+     - Long-running operations
+   - **File I/O example**: Keep synchronous (blocking I/O)
+
+4. **Testing Activities**
+   ```python
+   from temporalio.testing import ActivityEnvironment
+
+   activity_env = ActivityEnvironment()
+   activities = ConfigActivities()
+   result = activity_env.run(activities.load_event_config, config_path)
+   ```
+   - Use `ActivityEnvironment` for all activity tests
+   - Tests run activities synchronously (no Temporal server needed)
+   - Can assert on results and exceptions
+
+5. **Error Handling in Activities**
+   - Test ALL error paths that could cause workflow failures
+   - Missing files, malformed data, validation failures
+   - Invalid formats, missing required fields
+   - Aim for 95%+ coverage on activities (critical for workflows)
+
+### Activity Implementation Checklist
+
+Before implementing an activity, ask:
+- [ ] Does this operation involve I/O? → Use `@activity.defn`
+- [ ] Is the I/O blocking? → Keep synchronous (`def`)
+- [ ] Is the I/O async-friendly? → Use async (`async def`)
+- [ ] Implement as class-based pattern with methods
+- [ ] Test with `ActivityEnvironment`
+- [ ] Cover all error paths that could fail workflows
+
+### Example: ConfigActivities
+
+```python
+# src/activities/config.py
+class ConfigActivities:
+    """Activity class for configuration-related operations."""
+
+    @activity.defn
+    def load_event_config(self, config_path: str) -> EventConfig:
+        """Load TOML config (synchronous - blocking file I/O)."""
+        # Implementation with comprehensive error handling
+```
+
+```python
+# tests/unit/test_activities.py
+def test_load_event_config():
+    activity_env = ActivityEnvironment()
+    activities = ConfigActivities()
+    result = activity_env.run(activities.load_event_config, "path/to/config.toml")
+    assert isinstance(result, EventConfig)
+```
+
+## Activities Implemented (Phase 2 Started)
+
+### ConfigActivities (`src/activities/config.py`)
+- **Method**: `load_event_config(config_path: str) -> EventConfig`
+- **Pattern**: Synchronous (blocking file I/O with `tomllib`)
+- **Error handling**: FileNotFoundError, ValueError for malformed TOML, missing sections, invalid date/time formats
+- **Testing**: 13 comprehensive tests using `ActivityEnvironment`
+- **Coverage**: 95.92% (only missing generic exception handler)
 
 ## Reference Projects
 

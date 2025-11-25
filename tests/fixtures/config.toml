@@ -1,0 +1,21 @@
+# Test fixture: Valid event configuration for a 3-day event
+# Used by test_activities.py to test TOML parsing
+
+[dates]
+start_date = "2025-03-10"
+end_date = "2025-03-12"
+day_start_time = "09:00:00"
+day_end_time = "17:00:00"
+timezone = "America/Los_Angeles"
+
+[questions]
+file_path = "tests/fixtures/questions.json"
+per_day = 5
+
+[features]
+show_correct_answer = true
+require_work_email = true
+
+[s3]
+bucket_name = "test-marathon-trivia"
+region = "us-west-2"

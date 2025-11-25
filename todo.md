@@ -45,12 +45,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 ## Phase 2: Configuration and Question Loading
 
 ### Step 5: TOML Configuration Loading Activity
-- [ ] Write configuration activity tests (valid TOML, missing file, malformed TOML)
-- [ ] Create test fixture config.toml (3-day event, 5 questions per day)
-- [ ] Implement load_event_config() activity with TOML parsing
-- [ ] Add error handling for missing files and malformed TOML
-- [ ] Refactor error messages for clarity
-- [ ] Verify tests pass and run just check
+- [x] Write configuration activity tests (valid TOML, missing file, malformed TOML)
+- [x] Create test fixture config.toml (3-day event, 5 questions per day)
+- [x] Implement load_event_config() activity with TOML parsing
+- [x] Add error handling for missing files and malformed TOML
+- [x] Refactor error messages for clarity
+- [x] Verify tests pass and run just check
 
 ### Step 6: Questions JSON Loading Activity
 - [ ] Write questions activity tests (valid JSON, validation, missing file)
@@ -328,13 +328,13 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 ## Overall Progress
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
-**Phase 2: Configuration and Question Loading** - 0/4 steps complete (0%)
+**Phase 2: Configuration and Question Loading** - 1/4 steps complete (25%)
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 4/35 steps complete (11%)**
+**Total Progress: 5/35 steps complete (14%)**
 
 ---
 
