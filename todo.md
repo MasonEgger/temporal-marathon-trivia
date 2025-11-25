@@ -1,0 +1,355 @@
+# Marathon Trivia Platform - Implementation Todo
+
+**Last Updated**: 2025-11-25
+
+This file tracks the implementation progress of the Marathon Trivia Platform. Each checkbox corresponds to a numbered step in plan.md.
+
+---
+
+## Phase 1: Project Foundation
+
+### Step 1: Project Structure and Dependencies
+- [ ] Create project directory structure (src/, tests/, config/, frontend/, docs/)
+- [ ] Create pyproject.toml with dependencies and dev tools
+- [ ] Create Justfile with initial tasks (test, lint, format, typecheck, check)
+- [ ] Create .gitignore with Python ignores
+- [ ] Create .env.example with environment variables
+- [ ] Initialize uv lock file (run uv sync)
+- [ ] Verify setup (run just check)
+
+### Step 2: Core Data Models - Question
+- [ ] Write Question model tests (valid data, options validation, correct_answer validation)
+- [ ] Implement Question dataclass with pydantic validation
+- [ ] Add validators for A/B/C/D format and correct_answer
+- [ ] Update src/models/__init__.py exports
+- [ ] Refactor validation error messages
+- [ ] Verify tests pass and run just check
+
+### Step 3: Core Data Models - Player
+- [ ] Write Player model tests (creation, display_name, email validation)
+- [ ] Implement Player dataclass with fields and defaults
+- [ ] Add get_display_name() method with "FirstName L." format
+- [ ] Update src/models/__init__.py exports
+- [ ] Refactor with helper methods if needed
+- [ ] Verify tests pass and run just check
+
+### Step 4: Core Data Models - LeaderboardEntry and EventConfig
+- [ ] Write LeaderboardEntry tests
+- [ ] Implement LeaderboardEntry dataclass
+- [ ] Write EventConfig tests (date validation, timezone validation, color format)
+- [ ] Implement EventConfig dataclass with all fields from spec
+- [ ] Add validators for dates, timezone, questions_per_day
+- [ ] Update src/models/__init__.py exports
+- [ ] Add get_all_dates() helper method to EventConfig
+- [ ] Verify tests pass and run just check
+
+---
+
+## Phase 2: Configuration and Question Loading
+
+### Step 5: TOML Configuration Loading Activity
+- [ ] Write configuration activity tests (valid TOML, missing file, malformed TOML)
+- [ ] Create test fixture config.toml (3-day event, 5 questions per day)
+- [ ] Implement load_event_config() activity with TOML parsing
+- [ ] Add error handling for missing files and malformed TOML
+- [ ] Refactor error messages for clarity
+- [ ] Verify tests pass and run just check
+
+### Step 6: Questions JSON Loading Activity
+- [ ] Write questions activity tests (valid JSON, validation, missing file)
+- [ ] Create test fixture questions.json (3 days, 5 questions per day)
+- [ ] Implement load_questions() activity
+- [ ] Implement get_questions_for_day() activity
+- [ ] Write validate_questions_file() tests
+- [ ] Implement validate_questions_file() activity
+- [ ] Update src/activities/__init__.py exports
+- [ ] Refactor with caching if needed
+- [ ] Verify tests pass and run just check
+
+### Step 7: Email Validation Activity
+- [ ] Write email validation tests (valid email, consumer domains, invalid format)
+- [ ] Implement validate_email() activity with regex and domain blocking
+- [ ] Update src/activities/__init__.py exports
+- [ ] Refactor domain validation (case-insensitive)
+- [ ] Verify tests pass and run just check
+
+### Step 8: S3 CSV Export Activity
+- [ ] Write CSV export tests (format, columns, S3 upload, empty list)
+- [ ] Create test fixtures for players (create_test_player, create_test_players)
+- [ ] Implement export_daily_csv_to_s3() activity
+- [ ] Update src/activities/__init__.py exports
+- [ ] Write integration test with moto for S3
+- [ ] Make integration test pass
+- [ ] Refactor with retry logic and error handling
+- [ ] Verify tests pass and run just check
+
+---
+
+## Phase 3: Workflow Implementation - Player Entity
+
+### Step 9: PlayerEntityWorkflow - Basic Structure
+- [ ] Write PlayerEntityWorkflow initialization tests
+- [ ] Create temporal test environment fixture
+- [ ] Implement PlayerEntityWorkflow with basic structure
+- [ ] Add workflow.run method with player initialization
+- [ ] Add workflow.query methods (get_current_state, get_score_for_day, has_completed_day)
+- [ ] Update src/workflows/__init__.py exports
+- [ ] Refactor with proper type hints
+- [ ] Verify tests pass and run just check
+
+### Step 10: PlayerEntityWorkflow - Start Day Update Handler
+- [ ] Write start_day update handler tests
+- [ ] Implement start_day update handler
+- [ ] Configure activity execution with timeouts
+- [ ] Mock activity in tests
+- [ ] Refactor with validation
+- [ ] Verify tests pass and run just check
+
+### Step 11: PlayerEntityWorkflow - Submit Answer Update Handler
+- [ ] Write submit_answer update handler tests (correct/incorrect, next question, completion, validation)
+- [ ] Define AnswerResult dataclass
+- [ ] Implement submit_answer update handler
+- [ ] Refactor with helper methods (_get_current_question, _is_answer_correct)
+- [ ] Verify tests pass and run just check
+
+### Step 12: DailyWorkflow - Basic Structure
+- [ ] Write DailyWorkflow initialization tests
+- [ ] Implement DailyWorkflow with basic structure
+- [ ] Add workflow.run method with daily state initialization
+- [ ] Add workflow.query methods (get_daily_leaderboard, is_day_active)
+- [ ] Update src/workflows/__init__.py exports
+- [ ] Refactor with timezone support
+- [ ] Verify tests pass and run just check
+
+### Step 13: DailyWorkflow - Leaderboard Ranking Logic
+- [ ] Write leaderboard ranking tests (sorting, ties, alphabetical tie-breaking)
+- [ ] Create calculate_leaderboard() helper function
+- [ ] Implement get_daily_leaderboard() query
+- [ ] Write submit_score update handler tests
+- [ ] Implement submit_score update handler
+- [ ] Make submit_score tests pass
+- [ ] Refactor ranking logic if needed
+- [ ] Verify tests pass and run just check
+
+### Step 14: EventWorkflow - Basic Structure
+- [ ] Write EventWorkflow initialization tests
+- [ ] Implement EventWorkflow with basic structure
+- [ ] Add workflow.run method with config loading
+- [ ] Add workflow.query method (get_event_status)
+- [ ] Update src/workflows/__init__.py exports
+- [ ] Refactor with error handling for config loading
+- [ ] Verify tests pass and run just check
+
+### Step 15: EventWorkflow - Player Registration
+- [ ] Write register_player update handler tests (new player, duplicate, validation)
+- [ ] Implement register_player update handler
+- [ ] Add child workflow creation for PlayerEntityWorkflow
+- [ ] Refactor with player lookup helper
+- [ ] Verify tests pass and run just check
+
+### Step 16: EventWorkflow - Daily Workflow Scheduling
+- [ ] Write daily workflow scheduling tests
+- [ ] Implement daily workflow scheduling in run() method
+- [ ] Add timer-based workflow starting
+- [ ] Refactor with _schedule_daily_workflow helper
+- [ ] Verify tests pass and run just check
+
+---
+
+## Phase 4: API Layer Implementation
+
+### Step 17: FastAPI Application Setup
+- [ ] Write API setup tests (app creation, health endpoint, Temporal client)
+- [ ] Implement FastAPI app with main.py
+- [ ] Create RedisCache utility class
+- [ ] Add lifespan context manager for connections
+- [ ] Write cache tests with fakeredis
+- [ ] Make cache tests pass
+- [ ] Refactor with configuration management
+- [ ] Verify tests pass and run just check
+
+### Step 18: API Routes - Player Registration
+- [ ] Write player registration endpoint tests
+- [ ] Implement POST /api/join endpoint
+- [ ] Create HTML templates (join-success.html, error.html)
+- [ ] Update main.py to include player router
+- [ ] Refactor with template rendering utility
+- [ ] Verify tests pass and run just check
+
+### Step 19: API Routes - Gameplay Start Day
+- [ ] Write start day endpoint tests
+- [ ] Implement GET /api/day/{date}/start endpoint
+- [ ] Create question.html template
+- [ ] Update main.py to include gameplay router
+- [ ] Refactor with validation helpers
+- [ ] Verify tests pass and run just check
+
+### Step 20: API Routes - Submit Answer
+- [ ] Write submit answer endpoint tests
+- [ ] Implement POST /api/day/{date}/answer endpoint
+- [ ] Create completion.html and answer-feedback.html templates
+- [ ] Add score submission to DailyWorkflow
+- [ ] Refactor with error handling
+- [ ] Verify tests pass and run just check
+
+### Step 21: API Routes - Leaderboard
+- [ ] Write leaderboard endpoint tests with Redis caching
+- [ ] Implement GET /api/leaderboard endpoint
+- [ ] Create leaderboard.html template
+- [ ] Update main.py to include leaderboard router
+- [ ] Refactor with aggregation helper function
+- [ ] Verify tests pass and run just check
+
+### Step 22: API Routes - Configuration and Player Lookup
+- [ ] Write config and player endpoints tests
+- [ ] Implement GET /api/config endpoint with caching
+- [ ] Implement GET /api/player endpoint with highlighting
+- [ ] Update templates for player highlighting
+- [ ] Refactor with player state caching
+- [ ] Verify tests pass and run just check
+
+---
+
+## Phase 5: Frontend and Integration
+
+### Step 23: Frontend Templates - Landing Page
+- [ ] Create base.html template with Tailwind and HTMX
+- [ ] Create landing.html template (join form and returning player view)
+- [ ] Create day-button.html component
+- [ ] Add GET / landing page route to main.py
+- [ ] Write landing page rendering tests
+- [ ] Verify templates render correctly
+
+### Step 24: Frontend Styling with Tailwind
+- [ ] Update base.html with Tailwind configuration and custom colors
+- [ ] Style landing.html (form, day buttons, leaderboard container)
+- [ ] Style question.html (card layout, radio buttons)
+- [ ] Style leaderboard.html (table, striped rows, top 3 highlighting)
+- [ ] Style completion.html and error.html
+- [ ] Create custom CSS if needed (frontend/static/css/styles.css)
+- [ ] Test responsive design at different breakpoints
+- [ ] Verify high contrast and readability
+
+### Step 25: Worker and Temporal Client Setup
+- [ ] Implement src/worker.py with workflow and activity registration
+- [ ] Create src/temporal_client.py with connection utility
+- [ ] Write worker tests (creation, TLS configuration)
+- [ ] Make worker tests pass
+- [ ] Update API to use connection utility
+- [ ] Verify worker starts successfully
+- [ ] Verify tests pass and run just check
+
+### Step 26: Integration Test - Full Player Journey
+- [ ] Write full player journey integration test
+- [ ] Test player registration, answering questions, leaderboard
+- [ ] Test multi-day gameplay
+- [ ] Test duplicate email handling
+- [ ] Make integration tests pass
+- [ ] Refactor with test helpers
+- [ ] Verify integration tests pass with just test-integration
+
+### Step 27: Integration Test - Leaderboard Aggregation
+- [ ] Write leaderboard aggregation integration test (multiple players and days)
+- [ ] Test tie handling and ranking
+- [ ] Test alphabetical tie-breaking
+- [ ] Make leaderboard integration tests pass
+- [ ] Refactor with edge case tests
+- [ ] Verify integration tests pass with just test-integration
+
+---
+
+## Phase 6: Deployment and Documentation
+
+### Step 28: Docker Configuration
+- [ ] Create Dockerfile with multi-stage build
+- [ ] Create docker-compose.yml with all services
+- [ ] Create .dockerignore
+- [ ] Test Docker build
+- [ ] Test Docker Compose startup
+- [ ] Create docker-compose.dev.yml for development
+- [ ] Document Docker usage in README.md
+
+### Step 29: Justfile and Development Commands
+- [ ] Create Justfile with all commands
+- [ ] Add development commands (dev, worker, api)
+- [ ] Add testing commands (test, test-unit, test-integration, coverage)
+- [ ] Add linting commands (lint, format, typecheck, check)
+- [ ] Add Docker commands (build, up, down, logs)
+- [ ] Add data commands (export-csv, validate-config)
+- [ ] Test all Justfile commands
+- [ ] Document Justfile in README
+
+### Step 30: Example Configuration Files
+- [ ] Create config/event.example.toml with comprehensive documentation
+- [ ] Create config/questions.example.json with sample questions
+- [ ] Update .env.example with helpful comments
+- [ ] Create scripts/validate_config.py validator script
+- [ ] Test config validator on example and broken files
+- [ ] Document configuration in docs/how-to/create-event.md
+
+### Step 31: API Documentation
+- [ ] Create docs/api/endpoints.md with all endpoint specifications
+- [ ] Create docs/api/workflows.md with workflow documentation and diagrams
+- [ ] Create docs/api/activities.md with activity documentation
+- [ ] Create docs/api/data-models.md with dataclass documentation
+- [ ] Enhance FastAPI OpenAPI docs with comprehensive docstrings
+- [ ] Test all documentation examples
+
+### Step 32: How-To Guides
+- [ ] Create docs/how-to/setup.md with local development setup
+- [ ] Create docs/how-to/deployment.md with Docker Compose and Temporal Cloud
+- [ ] Create docs/how-to/create-event.md with event configuration guide
+- [ ] Create docs/how-to/monitoring.md with monitoring and debugging guide
+- [ ] Create docs/how-to/troubleshooting.md with common issues and solutions
+- [ ] Test all guides step-by-step
+
+### Step 33: README and Project Documentation
+- [ ] Create README.md with overview, quick start, configuration, development
+- [ ] Update CLAUDE.md with implementation learnings
+- [ ] Create CONTRIBUTING.md with code style and PR process
+- [ ] Create LICENSE file
+- [ ] Verify all documentation links work
+
+### Step 34: End-to-End Testing
+- [ ] Write complete event lifecycle end-to-end test
+- [ ] Test time-based day transitions
+- [ ] Create performance test with 100+ concurrent players
+- [ ] Make all end-to-end tests pass
+- [ ] Verify integration tests pass with just test-integration
+
+### Step 35: Final Testing and Quality Assurance
+- [ ] Run full test suite (just test)
+- [ ] Check test coverage >= 80% (just coverage)
+- [ ] Run type checking (just typecheck)
+- [ ] Run linting (just lint)
+- [ ] Run formatting (just format)
+- [ ] Run full check (just check)
+- [ ] Manual testing with Docker Compose
+- [ ] Load testing with 100+ players
+- [ ] Security review (secrets, CORS, input validation, XSS)
+- [ ] Documentation review (accuracy, links, examples)
+- [ ] Verify all success criteria from spec
+- [ ] Create release tag (v1.0.0)
+
+---
+
+## Overall Progress
+
+**Phase 1: Project Foundation** - 0/4 steps complete (0%)
+**Phase 2: Configuration and Question Loading** - 0/4 steps complete (0%)
+**Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
+**Phase 4: API Layer** - 0/6 steps complete (0%)
+**Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
+**Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
+
+**Total Progress: 0/35 steps complete (0%)**
+
+---
+
+## Notes
+
+- Update this file as each checkbox is completed
+- Mark steps complete ONLY when all sub-tasks pass
+- Each step should include: RED tests, GREEN implementation, REFACTOR improvements
+- Run `just check` after each step before marking complete
+- Update overall progress percentages regularly
