@@ -1,9 +1,12 @@
 # ABOUTME: PlayerEntityWorkflow maintains per-player state across entire event.
 # Handles answer submission, score tracking, and progress queries for individual players.
 
+from datetime import timedelta
+
 from temporalio import workflow
 
 from src.models.player import Player, PlayerState
+from src.models.question import Question
 
 
 @workflow.defn
@@ -87,6 +90,9 @@ class PlayerEntityWorkflow:
             ),
             current_day=self.state.current_day,
             current_question_index=self.state.current_question_index,
+            current_questions=(
+                list(self.state.current_questions) if self.state.current_questions else None
+            ),
         )
 
     @workflow.query
@@ -124,3 +130,53 @@ class PlayerEntityWorkflow:
             raise RuntimeError("Workflow state not initialized")
 
         return date in self.state.player.completed_days
+
+    @workflow.update
+    async def start_day(self, date: str, file_path: str = "config/questions.json") -> Question:
+        """Update handler to start a new day of questions.
+
+        Loads questions for the specified date via activity and returns the first question.
+        Sets the current_day and resets current_question_index to 0.
+
+        Args:
+            date: Date string in ISO format (e.g., "2025-03-10")
+            file_path: Path to questions JSON file (default: "config/questions.json")
+
+        Returns:
+            Question: The first question for the specified date
+
+        Raises:
+            RuntimeError: If workflow state is not initialized
+            ValueError: If day is already completed
+
+        Example:
+            >>> # In workflow execution
+            >>> first_question = await handle.execute_update(
+            ...     PlayerEntityWorkflow.start_day, "2025-03-10"
+            ... )
+        """
+        if self.state is None:
+            raise RuntimeError("Workflow state not initialized")
+
+        # Check if day already completed
+        if date in self.state.player.completed_days:
+            raise ValueError(f"Day {date} already completed")
+
+        # Import activity class
+        from src.activities.questions import QuestionsActivities
+
+        # Call activity to get questions for the day
+        questions_activities = QuestionsActivities()
+        questions = await workflow.execute_activity_method(
+            questions_activities.get_questions_for_day,
+            args=[file_path, date],
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+        # Store questions in workflow state
+        self.state.current_questions = questions
+        self.state.current_day = date
+        self.state.current_question_index = 0
+
+        # Return first question
+        return questions[0]

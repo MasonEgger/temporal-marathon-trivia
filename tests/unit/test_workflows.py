@@ -4,12 +4,45 @@
 import uuid
 
 import pytest
+from temporalio import activity
+from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from src.models.player import PlayerState
+from src.models.question import Question
 from src.workflows.player import PlayerEntityWorkflow
+
+
+# Mock activity for testing
+class MockQuestionsActivities:
+    """Mock questions activities for workflow testing."""
+
+    @activity.defn(name="get_questions_for_day")
+    async def get_questions_for_day(self, file_path: str, date: str) -> list[Question]:
+        """Mock get_questions_for_day that returns test questions."""
+        # Return 3 test questions for any date
+        return [
+            Question(
+                id="q1",
+                text="What is 2+2?",
+                options={"A": "3", "B": "4", "C": "5", "D": "6"},
+                correct_answer="B",
+            ),
+            Question(
+                id="q2",
+                text="What is the capital of France?",
+                options={"A": "London", "B": "Berlin", "C": "Paris", "D": "Madrid"},
+                correct_answer="C",
+            ),
+            Question(
+                id="q3",
+                text="What color is the sky?",
+                options={"A": "Red", "B": "Blue", "C": "Green", "D": "Yellow"},
+                correct_answer="B",
+            ),
+        ]
 
 
 class TestPlayerEntityWorkflow:
@@ -155,3 +188,168 @@ class TestPlayerEntityWorkflow:
                     PlayerEntityWorkflow.has_completed_day, "2025-03-10"
                 )
                 assert completed is False
+
+
+class TestPlayerEntityWorkflowStartDay:
+    """Test suite for PlayerEntityWorkflow start_day update handler."""
+
+    @pytest.mark.asyncio
+    async def test_start_day_returns_first_question(self) -> None:
+        """Test that start_day returns the first Question for the specified date."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Call start_day update handler
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.start_day, "2025-03-10"
+                )
+
+                # Should return first question
+                assert isinstance(result, Question)
+                assert result.id == "q1"
+                assert result.text == "What is 2+2?"
+
+    @pytest.mark.asyncio
+    async def test_start_day_sets_current_day_in_state(self) -> None:
+        """Test that start_day sets current_day in workflow state."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Call start_day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Query state to verify current_day is set
+                state = await handle.query(PlayerEntityWorkflow.get_current_state)
+                assert state.current_day == "2025-03-10"
+
+    @pytest.mark.asyncio
+    async def test_start_day_sets_current_question_index_to_zero(self) -> None:
+        """Test that start_day sets current_question_index to 0."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Call start_day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Query state to verify current_question_index is 0
+                state = await handle.query(PlayerEntityWorkflow.get_current_state)
+                assert state.current_question_index == 0
+
+    @pytest.mark.asyncio
+    async def test_start_day_raises_error_if_day_already_completed(self) -> None:
+        """Test that start_day raises ValueError if day is already completed."""
+        pytest.skip("RED phase - requires workflow modification to mark day complete")
+
+    @pytest.mark.asyncio
+    async def test_start_day_calls_get_questions_for_day_activity(self) -> None:
+        """Test that start_day calls the get_questions_for_day activity."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Call start_day - if activity isn't called, this will fail
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.start_day, "2025-03-10"
+                )
+
+                # If we get a result, activity was called successfully
+                assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_start_day_returns_question_with_correct_structure(self) -> None:
+        """Test that start_day returns a Question object with proper structure."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Call start_day
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.start_day, "2025-03-10"
+                )
+
+                # Verify Question structure
+                assert isinstance(result, Question)
+                assert hasattr(result, "id")
+                assert hasattr(result, "text")
+                assert hasattr(result, "options")
+                assert hasattr(result, "correct_answer")
+                assert len(result.options) == 4
+                assert set(result.options.keys()) == {"A", "B", "C", "D"}

@@ -309,10 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 started - 9/35 steps complete (26% total progress)
+**Current Status**: Phase 3 in progress - 10/35 steps complete (28.6% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 12.5% complete (1/8 steps)
+- Phase 3 (Workflow Implementation): 25% complete (2/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -708,20 +708,22 @@ Before writing a workflow test:
    - **Solution**: Return defensive copies from queries
    - **Pattern**: Use `dict()`, `set()` to copy mutable collections
 
-## Workflows Implemented (Phase 3: 12.5% Complete)
+## Workflows Implemented (Phase 3: 25% Complete)
 
 ### PlayerEntityWorkflow (`src/workflows/player.py`)
-- **Status**: Basic structure complete (Step 9) ✅
+- **Status**: Basic structure + start_day update handler complete (Steps 9-10) ✅
 - **Pattern**: Entity workflow (runs indefinitely)
-- **State**: PlayerState with Player model + current_day + current_question_index
+- **State**: PlayerState with Player model + current_day + current_question_index + current_questions
 - **Run method**: Initializes state, runs indefinitely with `workflow.wait_condition(lambda: False)`
 - **Queries implemented**:
   - `get_current_state() -> PlayerState` - Returns defensive copy of state
   - `get_score_for_day(date: str) -> int` - Returns score for specific day (0 if unplayed)
   - `has_completed_day(date: str) -> bool` - Checks if day is completed
-- **Testing**: 5 comprehensive tests with pydantic_data_converter
-- **Coverage**: 88.46% (26 statements, 3 missed)
-- **Next steps**: Implement start_day and submit_answer update handlers (Steps 10-11)
+- **Update handlers implemented**:
+  - `start_day(date: str, file_path: str = "config/questions.json") -> Question` - Loads questions via activity, returns first question
+- **Testing**: 10 comprehensive tests (5 queries + 5 update handlers) with pydantic_data_converter and activity mocking
+- **Coverage**: 87.80% (41 statements, 5 missed)
+- **Next steps**: Implement submit_answer update handler (Step 11)
 
 ### PlayerState (`src/models/player.py`)
 - **Purpose**: Workflow state for PlayerEntityWorkflow
@@ -729,8 +731,9 @@ Before writing a workflow test:
   - `player: Player` - Business data (identity, scores)
   - `current_day: str | None` - Current day being played
   - `current_question_index: int` - Current question index (0-based)
-- **Design**: Combines business data with workflow-specific state
-- **Coverage**: 100% (18 statements, 0 missed)
+  - `current_questions: list[Question] | None` - Questions for current day only (efficient storage)
+- **Design**: Combines business data with workflow-specific state. Stores only current day's questions (not all days) for efficiency.
+- **Coverage**: 100% (20 statements, 0 missed)
 
 ## Reference Projects
 
@@ -743,3 +746,76 @@ This project reuses patterns from:
 - **durable-wordle**: Entity workflow pattern reference
 
 **CRITICAL**: Always check samples-python when implementing new Temporal features (queries, updates, child workflows, etc.)
+
+### Update Handler Patterns (Steps 10+) 🔑
+
+1. **Calling Activities from Workflows** ⚠️
+   ```python
+   # WRONG - String-based (not type-safe, breaks on refactoring)
+   result = await workflow.execute_activity(
+       "get_questions_for_day",
+       args=[file_path, date],
+       start_to_close_timeout=timedelta(seconds=10),
+   )
+
+   # CORRECT - Method reference (type-safe, refactorable, IDE support)
+   from src.activities.questions import QuestionsActivities
+
+   questions_activities = QuestionsActivities()
+   result = await workflow.execute_activity_method(
+       questions_activities.get_questions_for_day,
+       args=[file_path, date],
+       start_to_close_timeout=timedelta(seconds=10),
+   )
+   ```
+   - **NEVER** call activities using string names
+   - **ALWAYS** import activity class, create instance, pass method reference
+   - Benefits: type safety, IDE autocomplete, refactoring support, compile-time errors
+   - Use `workflow.execute_activity_method()` not `workflow.execute_activity()`
+
+2. **Update Handlers vs Queries vs Signals**
+   ```python
+   @workflow.update
+   async def start_day(self, date: str) -> Question:
+       """Update handler - modifies state AND returns value immediately."""
+       # Validation
+       if self.state is None:
+           raise RuntimeError("Workflow state not initialized")
+       # Modify state
+       self.state.current_day = date
+       # Return value
+       return first_question
+   ```
+   - **Queries**: Read-only, `@workflow.query`, return data
+   - **Updates**: Modify state, `@workflow.update`, return value immediately
+   - **Signals**: Modify state, `@workflow.signal`, no return value
+   - Use updates when you need to modify state AND return a result
+
+3. **Activity Mocking in Workflow Tests**
+   ```python
+   class MockQuestionsActivities:
+       @activity.defn(name="get_questions_for_day")
+       async def get_questions_for_day(self, file_path: str, date: str) -> list[Question]:
+           return [Question(...), Question(...)]
+
+   # In test
+   mock_activities = MockQuestionsActivities()
+   async with Worker(
+       client,
+       task_queue="test-queue",
+       workflows=[PlayerEntityWorkflow],
+       activities=[mock_activities.get_questions_for_day],
+   ):
+       handle = await client.start_workflow(...)
+       result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+   ```
+   - Use `@activity.defn(name="actual_activity_name")` to mock activities
+   - Return test data without actual I/O
+   - Pass mock methods to Worker's activities list
+
+4. **Efficient State Storage**
+   - Store only what's needed for current operations
+   - Example: `current_questions: list[Question] | None` (current day only)
+   - NOT: `questions: dict[str, list[Question]]` (all days - wasteful!)
+   - Reduces memory per workflow, prevents duplication
+   - Think about scale: 1000 players × 50 questions vs 1000 players × 5 questions

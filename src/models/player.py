@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from pydantic import EmailStr
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
+from src.models.question import Question
+
 
 @pydantic_dataclass
 @dataclass
@@ -80,6 +82,7 @@ class PlayerState:
         player: Player model instance with identity and score tracking
         current_day: Current day being played (None if no day started)
         current_question_index: Index of current question in current day (0-based)
+        current_questions: List of questions for the current day (None if no day started)
 
     Example:
         >>> player = Player(id="p1", email="a@ex.com", first_name="Alice", last_name="Smith")
@@ -91,3 +94,4 @@ class PlayerState:
     player: Player
     current_day: str | None = None
     current_question_index: int = 0
+    current_questions: list[Question] | None = None
