@@ -1,0 +1,173 @@
+{
+  "2025-03-10": [
+    {
+      "id": "day1_q1",
+      "text": "What does EC2 stand for in AWS?",
+      "options": {
+        "A": "Elastic Compute Cloud",
+        "B": "Elastic Container Cloud",
+        "C": "Elastic Compute Cluster",
+        "D": "Elastic Cloud Computing"
+      },
+      "correct_answer": "A"
+    },
+    {
+      "id": "day1_q2",
+      "text": "Which AWS service is used for object storage?",
+      "options": {
+        "A": "EBS",
+        "B": "S3",
+        "C": "RDS",
+        "D": "DynamoDB"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "day1_q3",
+      "text": "What is the default maximum number of S3 buckets per AWS account?",
+      "options": {
+        "A": "50",
+        "B": "100",
+        "C": "200",
+        "D": "Unlimited"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "day1_q4",
+      "text": "Which AWS service provides a managed NoSQL database?",
+      "options": {
+        "A": "RDS",
+        "B": "Aurora",
+        "C": "DynamoDB",
+        "D": "Redshift"
+      },
+      "correct_answer": "C"
+    },
+    {
+      "id": "day1_q5",
+      "text": "What does VPC stand for in AWS?",
+      "options": {
+        "A": "Virtual Private Cloud",
+        "B": "Virtual Public Cloud",
+        "C": "Virtual Private Compute",
+        "D": "Virtual Protocol Connection"
+      },
+      "correct_answer": "A"
+    }
+  ],
+  "2025-03-11": [
+    {
+      "id": "day2_q1",
+      "text": "Which AWS service is used for serverless compute?",
+      "options": {
+        "A": "EC2",
+        "B": "ECS",
+        "C": "Lambda",
+        "D": "Fargate"
+      },
+      "correct_answer": "C"
+    },
+    {
+      "id": "day2_q2",
+      "text": "What is the maximum execution time for a Lambda function?",
+      "options": {
+        "A": "5 minutes",
+        "B": "10 minutes",
+        "C": "15 minutes",
+        "D": "30 minutes"
+      },
+      "correct_answer": "C"
+    },
+    {
+      "id": "day2_q3",
+      "text": "Which AWS service provides content delivery network (CDN) functionality?",
+      "options": {
+        "A": "Route 53",
+        "B": "CloudFront",
+        "C": "API Gateway",
+        "D": "Direct Connect"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "day2_q4",
+      "text": "What is the name of AWS's managed container orchestration service?",
+      "options": {
+        "A": "ECS",
+        "B": "EKS",
+        "C": "Fargate",
+        "D": "Both A and B"
+      },
+      "correct_answer": "D"
+    },
+    {
+      "id": "day2_q5",
+      "text": "Which AWS service is used for DNS management?",
+      "options": {
+        "A": "CloudFront",
+        "B": "Route 53",
+        "C": "VPC",
+        "D": "Direct Connect"
+      },
+      "correct_answer": "B"
+    }
+  ],
+  "2025-03-12": [
+    {
+      "id": "day3_q1",
+      "text": "What is AWS IAM used for?",
+      "options": {
+        "A": "Infrastructure monitoring",
+        "B": "Identity and access management",
+        "C": "Instance auto-scaling",
+        "D": "Image asset management"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "day3_q2",
+      "text": "Which AWS service provides managed message queuing?",
+      "options": {
+        "A": "SNS",
+        "B": "SQS",
+        "C": "EventBridge",
+        "D": "Kinesis"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "day3_q3",
+      "text": "What does RDS stand for in AWS?",
+      "options": {
+        "A": "Relational Database System",
+        "B": "Relational Data Storage",
+        "C": "Relational Database Service",
+        "D": "Remote Database Service"
+      },
+      "correct_answer": "C"
+    },
+    {
+      "id": "day3_q4",
+      "text": "Which AWS service is used for monitoring and observability?",
+      "options": {
+        "A": "CloudWatch",
+        "B": "CloudTrail",
+        "C": "X-Ray",
+        "D": "All of the above"
+      },
+      "correct_answer": "D"
+    },
+    {
+      "id": "day3_q5",
+      "text": "What is the AWS service for managed workflow orchestration?",
+      "options": {
+        "A": "Step Functions",
+        "B": "Lambda",
+        "C": "SWF",
+        "D": "Both A and C"
+      },
+      "correct_answer": "D"
+    }
+  ]
+}

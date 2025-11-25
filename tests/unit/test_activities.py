@@ -384,3 +384,330 @@ region = "us-west-2"
                 activity_env.run(activities.load_event_config, temp_path)
         finally:
             Path(temp_path).unlink()
+
+
+class TestQuestionsActivities:
+    """Tests for QuestionsActivities (Step 6)."""
+
+    def test_load_questions_successfully_parses_valid_json(self) -> None:
+        """Test that load_questions() successfully parses valid JSON file."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/questions.json"
+
+        activity_env = ActivityEnvironment()
+        activities = QuestionsActivities()
+        result = activity_env.run(activities.load_questions, questions_path)
+
+        # Should return a dict
+        assert isinstance(result, dict)
+        # Should have 3 dates
+        assert len(result) == 3
+        assert "2025-03-10" in result
+        assert "2025-03-11" in result
+        assert "2025-03-12" in result
+
+    def test_load_questions_returns_dict_of_date_to_questions(self) -> None:
+        """Test that load_questions() returns dict[str, list[Question]]."""
+        from src.activities.questions import QuestionsActivities
+        from src.models.question import Question
+
+        questions_path = "tests/fixtures/questions.json"
+
+        activity_env = ActivityEnvironment()
+        activities = QuestionsActivities()
+        result = activity_env.run(activities.load_questions, questions_path)
+
+        # Each date should map to a list of Questions
+        for _date_key, questions in result.items():
+            assert isinstance(questions, list)
+            assert len(questions) == 5  # 5 questions per day in fixture
+            for question in questions:
+                assert isinstance(question, Question)
+
+    def test_load_questions_validates_question_has_four_options(self) -> None:
+        """Test that load_questions() validates each question has exactly 4 options (A, B, C, D)."""
+        # This is validated by Question model's pydantic validation
+        # We'll create a fixture with invalid options and verify it fails
+        import tempfile
+
+        from src.activities.questions import QuestionsActivities
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            f.write(
+                """
+{
+  "2025-03-10": [
+    {
+      "id": "q1",
+      "text": "Test question?",
+      "options": {
+        "A": "Option A",
+        "B": "Option B"
+      },
+      "correct_answer": "A"
+    }
+  ]
+}
+"""
+            )
+            temp_path = f.name
+
+        try:
+            activity_env = ActivityEnvironment()
+            activities = QuestionsActivities()
+
+            with pytest.raises(ValueError, match="options must have exactly keys"):
+                activity_env.run(activities.load_questions, temp_path)
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_questions_validates_correct_answer_is_abcd(self) -> None:
+        """Test that load_questions() validates correct_answer is one of A/B/C/D."""
+        import tempfile
+
+        from src.activities.questions import QuestionsActivities
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            f.write(
+                """
+{
+  "2025-03-10": [
+    {
+      "id": "q1",
+      "text": "Test question?",
+      "options": {
+        "A": "Option A",
+        "B": "Option B",
+        "C": "Option C",
+        "D": "Option D"
+      },
+      "correct_answer": "E"
+    }
+  ]
+}
+"""
+            )
+            temp_path = f.name
+
+        try:
+            activity_env = ActivityEnvironment()
+            activities = QuestionsActivities()
+
+            with pytest.raises(
+                ValueError, match="correct_answer must be one of"
+            ):
+                activity_env.run(activities.load_questions, temp_path)
+        finally:
+            Path(temp_path).unlink()
+
+    def test_load_questions_raises_filenotfounderror_for_missing_file(self) -> None:
+        """Test that load_questions() raises FileNotFoundError for missing file."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/nonexistent.json"
+
+        activity_env = ActivityEnvironment()
+        activities = QuestionsActivities()
+
+        with pytest.raises(FileNotFoundError, match="Questions file not found"):
+            activity_env.run(activities.load_questions, questions_path)
+
+    def test_load_questions_raises_valueerror_for_malformed_json(self) -> None:
+        """Test that load_questions() raises ValueError for malformed JSON."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/questions_malformed.json"
+
+        activity_env = ActivityEnvironment()
+        activities = QuestionsActivities()
+
+        with pytest.raises(ValueError, match="Failed to parse JSON"):
+            activity_env.run(activities.load_questions, questions_path)
+
+    def test_get_questions_for_day_returns_correct_subset(self) -> None:
+        """Test that get_questions_for_day() returns correct subset for a date."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/questions.json"
+
+        activity_env = ActivityEnvironment()
+        activities = QuestionsActivities()
+        result = activity_env.run(
+            activities.get_questions_for_day, questions_path, "2025-03-10"
+        )
+
+        # Should return list of 5 questions for day 1
+        assert isinstance(result, list)
+        assert len(result) == 5
+        # Verify first question ID
+        assert result[0].id == "day1_q1"
+
+    def test_get_questions_for_day_raises_keyerror_for_invalid_date(self) -> None:
+        """Test that get_questions_for_day() raises KeyError for invalid date."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/questions.json"
+
+        activity_env = ActivityEnvironment()
+        activities = QuestionsActivities()
+
+        with pytest.raises(KeyError, match="Date.*not found in questions file"):
+            activity_env.run(
+                activities.get_questions_for_day, questions_path, "2025-03-99"
+            )
+
+    def test_validate_questions_file_succeeds_for_valid_file(self) -> None:
+        """Test that validate_questions_file() succeeds for valid file."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/questions.json"
+        config_path = "tests/fixtures/config.toml"
+
+        # Load config first
+        from src.activities.config import ConfigActivities
+
+        activity_env = ActivityEnvironment()
+        config_activities = ConfigActivities()
+        config = activity_env.run(config_activities.load_event_config, config_path)
+
+        # Validate questions file
+        activities = QuestionsActivities()
+        # Should not raise any exception
+        activity_env.run(activities.validate_questions_file, questions_path, config)
+
+    def test_validate_questions_file_validates_dates_match_config(self) -> None:
+        """Test that validate_questions_file() raises ValueError if dates don't match config."""
+        # Create questions file with dates that don't match config
+        import tempfile
+
+        from src.activities.questions import QuestionsActivities
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            f.write(
+                """
+{
+  "2025-03-10": [
+    {
+      "id": "q1",
+      "text": "Q?",
+      "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
+      "correct_answer": "A"
+    }
+  ]
+}
+"""
+            )
+            temp_path = f.name
+
+        try:
+            config_path = "tests/fixtures/config.toml"
+
+            from src.activities.config import ConfigActivities
+
+            activity_env = ActivityEnvironment()
+            config_activities = ConfigActivities()
+            config = activity_env.run(
+                config_activities.load_event_config, config_path
+            )
+
+            activities = QuestionsActivities()
+
+            with pytest.raises(ValueError, match="Missing questions for date"):
+                activity_env.run(activities.validate_questions_file, temp_path, config)
+        finally:
+            Path(temp_path).unlink()
+
+    def test_validate_questions_file_validates_question_count_per_day(self) -> None:
+        """Test that validate_questions_file() raises ValueError if question count doesn't match."""
+        # Create questions file with wrong number of questions per day
+        import tempfile
+
+        from src.activities.questions import QuestionsActivities
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False
+        ) as f:
+            f.write(
+                """
+{
+  "2025-03-10": [
+    {
+      "id": "q1",
+      "text": "Q?",
+      "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
+      "correct_answer": "A"
+    },
+    {
+      "id": "q2",
+      "text": "Q?",
+      "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
+      "correct_answer": "A"
+    }
+  ],
+  "2025-03-11": [
+    {
+      "id": "q1",
+      "text": "Q?",
+      "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
+      "correct_answer": "A"
+    }
+  ],
+  "2025-03-12": [
+    {
+      "id": "q1",
+      "text": "Q?",
+      "options": {"A": "A", "B": "B", "C": "C", "D": "D"},
+      "correct_answer": "A"
+    }
+  ]
+}
+"""
+            )
+            temp_path = f.name
+
+        try:
+            config_path = "tests/fixtures/config.toml"
+
+            from src.activities.config import ConfigActivities
+
+            activity_env = ActivityEnvironment()
+            config_activities = ConfigActivities()
+            config = activity_env.run(
+                config_activities.load_event_config, config_path
+            )
+
+            activities = QuestionsActivities()
+
+            with pytest.raises(
+                ValueError, match="Date.*has.*questions, expected"
+            ):
+                activity_env.run(activities.validate_questions_file, temp_path, config)
+        finally:
+            Path(temp_path).unlink()
+
+    def test_validate_questions_file_raises_filenotfounderror_for_missing_file(
+        self,
+    ) -> None:
+        """Test that validate_questions_file() raises FileNotFoundError for missing file."""
+        from src.activities.questions import QuestionsActivities
+
+        questions_path = "tests/fixtures/nonexistent.json"
+        config_path = "tests/fixtures/config.toml"
+
+        from src.activities.config import ConfigActivities
+
+        activity_env = ActivityEnvironment()
+        config_activities = ConfigActivities()
+        config = activity_env.run(config_activities.load_event_config, config_path)
+
+        activities = QuestionsActivities()
+
+        with pytest.raises(FileNotFoundError):
+            activity_env.run(activities.validate_questions_file, questions_path, config)

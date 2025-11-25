@@ -1,0 +1,13 @@
+{
+  "2025-03-10": [
+    {
+      "id": "day1_q1",
+      "text": "What does EC2 stand for?",
+      "options": {
+        "A": "Elastic Compute Cloud",
+        "B": "Elastic Container Cloud"
+      }
+      // Missing correct_answer and closing brace
+    }
+  ]
+}

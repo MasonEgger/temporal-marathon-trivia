@@ -309,9 +309,9 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 2 started - 5/35 steps complete (14% total progress)
+**Current Status**: Phase 2 in progress - 6/35 steps complete (17% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
-- Phase 2 (Configuration and Question Loading): 25% complete (Step 5 done)
+- Phase 2 (Configuration and Question Loading): 50% complete (Steps 5-6 done)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -495,7 +495,7 @@ def test_load_event_config():
     assert isinstance(result, EventConfig)
 ```
 
-## Activities Implemented (Phase 2 Started)
+## Activities Implemented (Phase 2: 50% Complete)
 
 ### ConfigActivities (`src/activities/config.py`)
 - **Method**: `load_event_config(config_path: str) -> EventConfig`
@@ -503,6 +503,17 @@ def test_load_event_config():
 - **Error handling**: FileNotFoundError, ValueError for malformed TOML, missing sections, invalid date/time formats
 - **Testing**: 13 comprehensive tests using `ActivityEnvironment`
 - **Coverage**: 95.92% (only missing generic exception handler)
+
+### QuestionsActivities (`src/activities/questions.py`)
+- **Methods**:
+  - `load_questions(file_path: str) -> dict[str, list[Question]]` - Load and parse all questions from JSON
+  - `get_questions_for_day(file_path: str, date: str) -> list[Question]` - Get questions for specific date
+  - `validate_questions_file(file_path: str, config: EventConfig) -> None` - Validate questions against config
+- **Pattern**: Synchronous (blocking file I/O with `json`)
+- **Error handling**: FileNotFoundError, ValueError for malformed JSON, KeyError for invalid dates, validation failures
+- **Testing**: 12 comprehensive tests using `ActivityEnvironment`
+- **Coverage**: 100% (41 statements, 0 missed)
+- **Key Design**: Leverages Question model's pydantic validation for A/B/C/D and correct_answer checks
 
 ## Reference Projects
 

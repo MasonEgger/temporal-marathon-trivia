@@ -53,14 +53,14 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 6: Questions JSON Loading Activity
-- [ ] Write questions activity tests (valid JSON, validation, missing file)
-- [ ] Create test fixture questions.json (3 days, 5 questions per day)
-- [ ] Implement load_questions() activity
-- [ ] Implement get_questions_for_day() activity
-- [ ] Write validate_questions_file() tests
-- [ ] Implement validate_questions_file() activity
-- [ ] Refactor with caching if needed
-- [ ] Verify tests pass and run just check
+- [x] Write questions activity tests (valid JSON, validation, missing file)
+- [x] Create test fixture questions.json (3 days, 5 questions per day)
+- [x] Implement load_questions() activity
+- [x] Implement get_questions_for_day() activity
+- [x] Write validate_questions_file() tests
+- [x] Implement validate_questions_file() activity
+- [x] Refactor with caching if needed
+- [x] Verify tests pass and run just check
 
 ### Step 7: Email Validation Activity
 - [ ] Write email validation tests (valid email, consumer domains, invalid format)
@@ -328,13 +328,13 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 ## Overall Progress
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
-**Phase 2: Configuration and Question Loading** - 1/4 steps complete (25%)
+**Phase 2: Configuration and Question Loading** - 2/4 steps complete (50%)
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 5/35 steps complete (14%)**
+**Total Progress: 6/35 steps complete (17%)**
 
 ---
 
