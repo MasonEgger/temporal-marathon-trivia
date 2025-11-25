@@ -309,9 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 2 complete - 8/35 steps complete (23% total progress)
+**Current Status**: Phase 3 started - 9/35 steps complete (26% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
+- Phase 3 (Workflow Implementation): 12.5% complete (1/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -570,10 +571,175 @@ def test_load_event_config():
   - Dynamic day columns based on event_dates parameter
   - Works with moto for reliable testing without AWS credentials
 
+## Temporal Workflow Implementation Patterns (CRITICAL)
+
+### Workflow Best Practices
+
+**All workflows MUST follow these patterns:**
+
+1. **Entity Workflow Pattern** 🔑
+   ```python
+   @workflow.defn
+   class PlayerEntityWorkflow:
+       def __init__(self) -> None:
+           self.state: PlayerState | None = None
+
+       @workflow.run
+       async def run(self, player_id: str, email: str, first_name: str, last_name: str) -> None:
+           # Initialize state
+           self.state = PlayerState(player=Player(...))
+           # Keep running indefinitely
+           await workflow.wait_condition(lambda: False)
+   ```
+   - Entity workflows run indefinitely for entire business process duration
+   - Use `workflow.wait_condition(lambda: False)` to keep alive
+   - State persists in workflow instance (self.state)
+   - Respond to queries and update handlers while running
+   - Perfect for per-user, per-game, per-order scenarios
+
+2. **Workflow Queries** 🔑
+   ```python
+   @workflow.query
+   def get_current_state(self) -> PlayerState:
+       if self.state is None:
+           raise RuntimeError("Workflow state not initialized")
+       # CRITICAL: Return defensive copy to prevent external mutation
+       return PlayerState(
+           player=Player(
+               id=self.state.player.id,
+               email=self.state.player.email,
+               # ... copy all fields
+               daily_scores=dict(self.state.player.daily_scores),
+               completed_days=set(self.state.player.completed_days),
+           ),
+           current_day=self.state.current_day,
+           current_question_index=self.state.current_question_index,
+       )
+   ```
+   - Queries are read-only operations
+   - **ALWAYS return defensive copies** (never return self.state directly)
+   - Use `dict()`, `set()` for mutable collections
+   - Can be called even after workflow completes
+   - Always validate state is initialized
+
+3. **Pydantic Data Converter** 🔑
+   ```python
+   # Required when using pydantic models (EmailStr, BaseModel, etc.)
+   from temporalio.client import Client
+   from temporalio.contrib.pydantic import pydantic_data_converter
+
+   # In tests
+   async with await WorkflowEnvironment.start_time_skipping() as env:
+       # Configure client with pydantic converter
+       new_config = env.client.config()
+       new_config["data_converter"] = pydantic_data_converter
+       client = Client(**new_config)
+
+       async with Worker(client, task_queue="test-queue", workflows=[MyWorkflow]):
+           handle = await client.start_workflow(...)
+   ```
+   - **Required** for serializing pydantic models in workflows
+   - Handles EmailStr, BaseModel, and other pydantic types
+   - Configure per-client (not global)
+   - Must be used consistently (worker and client)
+   - Without this, you'll get: `TypeError: Unserializable type during conversion`
+
+4. **Workflow Testing with WorkflowEnvironment** 🔑
+   ```python
+   from temporalio.testing import WorkflowEnvironment
+   from temporalio.worker import Worker
+
+   async with await WorkflowEnvironment.start_time_skipping() as env:
+       # Configure client with pydantic converter
+       new_config = env.client.config()
+       new_config["data_converter"] = pydantic_data_converter
+       client = Client(**new_config)
+
+       async with Worker(client, task_queue="test-queue", workflows=[MyWorkflow]):
+           handle = await client.start_workflow(
+               MyWorkflow.run,
+               args=["arg1", "arg2"],
+               id=f"test-workflow-{uuid.uuid4()}",
+               task_queue="test-queue",
+           )
+           # Query the workflow
+           result = await handle.query(MyWorkflow.my_query)
+   ```
+   - Use `WorkflowEnvironment.start_time_skipping()` for unit tests
+   - Allows time control for testing time-dependent logic
+   - Clean async context managers for setup/teardown
+   - Worker must be running to execute workflow
+   - Always use unique workflow IDs in tests
+
+5. **Data Model Placement** 🔑
+   - **Place in `src/models/`** if:
+     - Used by multiple workflows/activities
+     - Represents business data (Player, Question, Config)
+     - Has validation logic
+     - Needs to be serialized across workflow boundaries
+   - **Example**: PlayerState is in `src/models/player.py` (not in workflow file)
+   - **Rationale**: Clean separation of concerns, reusable data structures
+
+### Workflow Testing Checklist
+
+Before writing a workflow test:
+- [ ] Import pydantic_data_converter from temporalio.contrib.pydantic
+- [ ] Configure client with pydantic converter in test setup
+- [ ] Use WorkflowEnvironment.start_time_skipping() for unit tests
+- [ ] Generate unique workflow IDs with uuid.uuid4()
+- [ ] Test queries return correct data types
+- [ ] Test state initialization (zero scores, empty sets)
+- [ ] Mock activities if workflow calls them (future steps)
+
+### Common Workflow Errors and Solutions
+
+1. **EmailStr Serialization Error**
+   - **Error**: `TypeError: Unserializable type during conversion: <class 'pydantic.networks.EmailStr'>`
+   - **Solution**: Configure client with `pydantic_data_converter`
+   - **Where**: In test setup before creating Worker
+
+2. **State Not Initialized**
+   - **Error**: Queries fail or return None
+   - **Solution**: Always check `if self.state is None` in queries
+   - **Pattern**: Raise RuntimeError with clear message
+
+3. **External State Mutation**
+   - **Error**: Workflow state gets modified externally
+   - **Solution**: Return defensive copies from queries
+   - **Pattern**: Use `dict()`, `set()` to copy mutable collections
+
+## Workflows Implemented (Phase 3: 12.5% Complete)
+
+### PlayerEntityWorkflow (`src/workflows/player.py`)
+- **Status**: Basic structure complete (Step 9) ✅
+- **Pattern**: Entity workflow (runs indefinitely)
+- **State**: PlayerState with Player model + current_day + current_question_index
+- **Run method**: Initializes state, runs indefinitely with `workflow.wait_condition(lambda: False)`
+- **Queries implemented**:
+  - `get_current_state() -> PlayerState` - Returns defensive copy of state
+  - `get_score_for_day(date: str) -> int` - Returns score for specific day (0 if unplayed)
+  - `has_completed_day(date: str) -> bool` - Checks if day is completed
+- **Testing**: 5 comprehensive tests with pydantic_data_converter
+- **Coverage**: 88.46% (26 statements, 3 missed)
+- **Next steps**: Implement start_day and submit_answer update handlers (Steps 10-11)
+
+### PlayerState (`src/models/player.py`)
+- **Purpose**: Workflow state for PlayerEntityWorkflow
+- **Fields**:
+  - `player: Player` - Business data (identity, scores)
+  - `current_day: str | None` - Current day being played
+  - `current_question_index: int` - Current question index (0-based)
+- **Design**: Combines business data with workflow-specific state
+- **Coverage**: 100% (18 statements, 0 missed)
+
 ## Reference Projects
 
 This project reuses patterns from:
+- **samples-python** (`/Users/masonegger/Code/Temporal/samples-python/`): Official Temporal Python SDK examples
+  - `tests/hello/` - Query and update handler patterns
+  - `pydantic_converter/` - Pydantic data converter usage
+  - `tests/conftest.py` - WorkflowEnvironment fixture patterns
 - **temporal-trivia-python**: Testing patterns, workflow structure, config patterns
 - **durable-wordle**: Entity workflow pattern reference
 
-See these repositories for proven implementations of Temporal Python SDK patterns.
+**CRITICAL**: Always check samples-python when implementing new Temporal features (queries, updates, child workflows, etc.)
