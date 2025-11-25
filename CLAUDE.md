@@ -309,9 +309,9 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 2 in progress - 6/35 steps complete (17% total progress)
+**Current Status**: Phase 2 in progress - 7/35 steps complete (20% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
-- Phase 2 (Configuration and Question Loading): 50% complete (Steps 5-6 done)
+- Phase 2 (Configuration and Question Loading): 75% complete (Steps 5-7 done)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -495,7 +495,7 @@ def test_load_event_config():
     assert isinstance(result, EventConfig)
 ```
 
-## Activities Implemented (Phase 2: 50% Complete)
+## Activities Implemented (Phase 2: 75% Complete)
 
 ### ConfigActivities (`src/activities/config.py`)
 - **Method**: `load_event_config(config_path: str) -> EventConfig`
@@ -514,6 +514,17 @@ def test_load_event_config():
 - **Testing**: 12 comprehensive tests using `ActivityEnvironment`
 - **Coverage**: 100% (41 statements, 0 missed)
 - **Key Design**: Leverages Question model's pydantic validation for A/B/C/D and correct_answer checks
+
+### EmailActivities (`src/activities/email.py`)
+- **Method**: `validate_email(email: str, require_work_email: bool) -> bool`
+- **Pattern**: Synchronous (pure logic, no I/O - just regex and string operations)
+- **Email validation**: RFC 5322 format checking via regex pattern
+- **Consumer domain blocking**: Blocks gmail, yahoo, hotmail, outlook, aol, icloud when `require_work_email=True`
+- **Case-insensitive**: Domain checking uses `.lower()` for case-insensitive comparison
+- **Error handling**: Graceful handling of empty strings and malformed emails (returns False)
+- **Testing**: 10 comprehensive tests using `ActivityEnvironment`
+- **Coverage**: 88.89% (18 statements, 2 missed - only generic exception handler)
+- **Key Design**: Returns bool (True if valid, False otherwise) rather than raising exceptions
 
 ## Reference Projects
 

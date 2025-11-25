@@ -63,10 +63,10 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 7: Email Validation Activity
-- [ ] Write email validation tests (valid email, consumer domains, invalid format)
-- [ ] Implement validate_email() activity with regex and domain blocking
-- [ ] Refactor domain validation (case-insensitive)
-- [ ] Verify tests pass and run just check
+- [x] Write email validation tests (valid email, consumer domains, invalid format)
+- [x] Implement validate_email() activity with regex and domain blocking
+- [x] Refactor domain validation (case-insensitive)
+- [x] Verify tests pass and run just check
 
 ### Step 8: S3 CSV Export Activity
 - [ ] Write CSV export tests (format, columns, S3 upload, empty list)
@@ -328,13 +328,13 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 ## Overall Progress
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
-**Phase 2: Configuration and Question Loading** - 2/4 steps complete (50%)
+**Phase 2: Configuration and Question Loading** - 3/4 steps complete (75%)
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 6/35 steps complete (17%)**
+**Total Progress: 7/35 steps complete (20%)**
 
 ---
 

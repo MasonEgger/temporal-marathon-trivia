@@ -711,3 +711,142 @@ class TestQuestionsActivities:
 
         with pytest.raises(FileNotFoundError):
             activity_env.run(activities.validate_questions_file, questions_path, config)
+
+
+class TestEmailActivities:
+    """Tests for EmailActivities (Step 7)."""
+
+    def test_validate_email_returns_true_for_valid_work_email(self) -> None:
+        """Test that validate_email() returns True for valid work email."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "john.doe@company.com", True
+        )
+
+        assert result is True
+
+    def test_validate_email_returns_true_for_any_email_when_require_work_email_false(
+        self,
+    ) -> None:
+        """Test that validate_email() returns True for any email when require_work_email=False."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+
+        # Gmail should be valid when not requiring work email
+        result = activity_env.run(
+            activities.validate_email, "user@gmail.com", False
+        )
+        assert result is True
+
+    def test_validate_email_returns_false_for_invalid_email_format(self) -> None:
+        """Test that validate_email() returns False for invalid email format (no @)."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "not-an-email", True
+        )
+
+        assert result is False
+
+    def test_validate_email_returns_false_for_gmail_when_require_work_email_true(
+        self,
+    ) -> None:
+        """Test that validate_email() returns False for gmail.com when require_work_email=True."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "user@gmail.com", True
+        )
+
+        assert result is False
+
+    def test_validate_email_returns_false_for_yahoo_when_require_work_email_true(
+        self,
+    ) -> None:
+        """Test that validate_email() returns False for yahoo.com when require_work_email=True."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "user@yahoo.com", True
+        )
+
+        assert result is False
+
+    def test_validate_email_returns_false_for_hotmail_when_require_work_email_true(
+        self,
+    ) -> None:
+        """Test that validate_email() returns False for hotmail.com when require_work_email=True."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "user@hotmail.com", True
+        )
+
+        assert result is False
+
+    def test_validate_email_returns_false_for_outlook_when_require_work_email_true(
+        self,
+    ) -> None:
+        """Test that validate_email() returns False for outlook.com when require_work_email=True."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "user@outlook.com", True
+        )
+
+        assert result is False
+
+    def test_validate_email_returns_false_for_aol_when_require_work_email_true(
+        self,
+    ) -> None:
+        """Test that validate_email() returns False for aol.com when require_work_email=True."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "user@aol.com", True
+        )
+
+        assert result is False
+
+    def test_validate_email_returns_false_for_icloud_when_require_work_email_true(
+        self,
+    ) -> None:
+        """Test that validate_email() returns False for icloud.com when require_work_email=True."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "user@icloud.com", True
+        )
+
+        assert result is False
+
+    def test_validate_email_handles_empty_string_gracefully(self) -> None:
+        """Test that validate_email() handles empty string gracefully (returns False)."""
+        from src.activities.email import EmailActivities
+
+        activity_env = ActivityEnvironment()
+        activities = EmailActivities()
+        result = activity_env.run(
+            activities.validate_email, "", True
+        )
+
+        assert result is False
