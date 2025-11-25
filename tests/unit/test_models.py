@@ -1,6 +1,8 @@
 # ABOUTME: Unit tests for data models (Question, Player, EventConfig, LeaderboardEntry).
 # Tests focus on application-specific validation logic, not pydantic framework behavior.
 
+from datetime import date, time
+
 import pytest
 from pydantic import ValidationError
 
@@ -276,3 +278,265 @@ class TestPlayerModel:
 
         # Verify error mentions email
         assert "email" in str(exc_info.value).lower()
+
+
+class TestLeaderboardEntryModel:
+    """Test suite for LeaderboardEntry data model."""
+
+    def test_leaderboard_entry_with_valid_data_creates_successfully(self) -> None:
+        """Test that LeaderboardEntry with valid data creates successfully."""
+        from src.models.leaderboard import LeaderboardEntry
+
+        entry = LeaderboardEntry(
+            rank=1,
+            display_name="John D.",
+            total_score=150,
+            daily_scores={"2025-03-10": 50, "2025-03-11": 100},
+            email="john.doe@example.com",
+        )
+
+        assert entry.rank == 1
+        assert entry.display_name == "John D."
+        assert entry.total_score == 150
+        assert entry.daily_scores == {"2025-03-10": 50, "2025-03-11": 100}
+        assert entry.email == "john.doe@example.com"
+
+    def test_leaderboard_entry_fields_are_correctly_typed(self) -> None:
+        """Test that LeaderboardEntry fields have correct types."""
+        from src.models.leaderboard import LeaderboardEntry
+
+        entry = LeaderboardEntry(
+            rank=5,
+            display_name="Alice B.",
+            total_score=200,
+            daily_scores={"2025-03-10": 100, "2025-03-11": 100},
+            email="alice.brown@example.com",
+        )
+
+        assert isinstance(entry.rank, int)
+        assert isinstance(entry.display_name, str)
+        assert isinstance(entry.total_score, int)
+        assert isinstance(entry.daily_scores, dict)
+        assert isinstance(entry.email, str)
+
+    def test_leaderboard_entry_with_empty_daily_scores(self) -> None:
+        """Test that LeaderboardEntry can be created with empty daily_scores dict."""
+        from src.models.leaderboard import LeaderboardEntry
+
+        entry = LeaderboardEntry(
+            rank=1,
+            display_name="New Player",
+            total_score=0,
+            daily_scores={},
+            email="new@example.com",
+        )
+
+        assert entry.daily_scores == {}
+        assert entry.total_score == 0
+
+
+class TestEventConfigModel:
+    """Test suite for EventConfig data model validation."""
+
+    def test_event_config_with_all_required_fields_creates_successfully(self) -> None:
+        """Test that EventConfig with all required fields creates successfully."""
+        from src.models.config import EventConfig
+
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0, 0),
+            day_end_time=time(17, 0, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            s3_bucket_name="test-bucket",
+            s3_region="us-west-2",
+        )
+
+        assert config.start_date == date(2025, 3, 10)
+        assert config.end_date == date(2025, 3, 12)
+        assert config.questions_per_day == 5
+        assert config.timezone == "America/Los_Angeles"
+
+    def test_event_config_date_validation_ensures_end_date_after_start_date(
+        self,
+    ) -> None:
+        """Test that EventConfig validates end_date > start_date."""
+        from src.models.config import EventConfig
+
+        # Valid: end_date > start_date should work
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+        assert config.end_date > config.start_date
+
+    def test_event_config_with_end_date_before_start_date_raises_validation_error(
+        self,
+    ) -> None:
+        """Test that EventConfig with end_date < start_date raises validation error."""
+        from src.models.config import EventConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            EventConfig(
+                start_date=date(2025, 3, 15),  # Later than end_date
+                end_date=date(2025, 3, 10),  # Earlier than start_date
+                day_start_time=time(9, 0),
+                day_end_time=time(17, 0),
+                timezone="America/Los_Angeles",
+                questions_file_path="config/questions.json",
+                questions_per_day=5,
+                show_correct_answer=True,
+                require_work_email=False,
+                s3_bucket_name="bucket",
+                s3_region="us-west-2",
+            )
+
+        # Verify error mentions dates
+        assert "date" in str(exc_info.value).lower()
+
+    def test_event_config_validates_timezone_is_valid(self) -> None:
+        """Test that EventConfig validates timezone is valid."""
+        from src.models.config import EventConfig
+
+        # Valid timezone should work
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/New_York",  # Valid timezone
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+        assert config.timezone == "America/New_York"
+
+    def test_event_config_with_invalid_timezone_raises_validation_error(self) -> None:
+        """Test that EventConfig with invalid timezone raises validation error."""
+        from src.models.config import EventConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            EventConfig(
+                start_date=date(2025, 3, 10),
+                end_date=date(2025, 3, 12),
+                day_start_time=time(9, 0),
+                day_end_time=time(17, 0),
+                timezone="Invalid/Timezone",  # Invalid timezone
+                questions_file_path="config/questions.json",
+                questions_per_day=5,
+                show_correct_answer=True,
+                require_work_email=False,
+                s3_bucket_name="bucket",
+                s3_region="us-west-2",
+            )
+
+        # Verify error mentions timezone
+        assert "timezone" in str(exc_info.value).lower()
+
+    def test_event_config_questions_per_day_must_be_positive_integer(self) -> None:
+        """Test that EventConfig.questions_per_day must be positive integer."""
+        from src.models.config import EventConfig
+
+        # Positive integer should work
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=10,  # Positive integer
+            show_correct_answer=True,
+            require_work_email=False,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+        assert config.questions_per_day == 10
+
+    def test_event_config_with_zero_questions_per_day_raises_validation_error(
+        self,
+    ) -> None:
+        """Test that EventConfig with questions_per_day=0 raises validation error."""
+        from src.models.config import EventConfig
+
+        with pytest.raises(ValidationError) as exc_info:
+            EventConfig(
+                start_date=date(2025, 3, 10),
+                end_date=date(2025, 3, 12),
+                day_start_time=time(9, 0),
+                day_end_time=time(17, 0),
+                timezone="America/Los_Angeles",
+                questions_file_path="config/questions.json",
+                questions_per_day=0,  # Invalid: must be positive
+                show_correct_answer=True,
+                require_work_email=False,
+                s3_bucket_name="bucket",
+                s3_region="us-west-2",
+            )
+
+        # Verify error mentions questions_per_day
+        assert "questions_per_day" in str(exc_info.value).lower()
+
+    def test_event_config_get_all_dates_returns_list_of_dates(self) -> None:
+        """Test that EventConfig.get_all_dates() returns list of dates from start to end."""
+        from src.models.config import EventConfig
+
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+
+        dates = config.get_all_dates()
+
+        assert len(dates) == 3
+        assert dates[0] == date(2025, 3, 10)
+        assert dates[1] == date(2025, 3, 11)
+        assert dates[2] == date(2025, 3, 12)
+
+    def test_event_config_get_all_dates_single_day_event(self) -> None:
+        """Test that get_all_dates() works for single-day events."""
+        from src.models.config import EventConfig
+
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 10),  # Same day
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+
+        dates = config.get_all_dates()
+
+        assert len(dates) == 1
+        assert dates[0] == date(2025, 3, 10)

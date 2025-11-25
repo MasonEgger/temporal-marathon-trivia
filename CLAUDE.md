@@ -309,7 +309,7 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 1, Step 3 complete (3/35 steps, 9% complete)
+**Current Status**: Phase 1 complete - 4/4 steps (11% total progress, ready for Phase 2)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -372,7 +372,7 @@ Every source file must start with:
 - Test your validation rules, business logic, and data transformations
 - Test directories do NOT have `__init__.py` files
 
-## Data Models Implemented
+## Data Models Implemented (Phase 1 Complete)
 
 ### Question Model (`src/models/question.py`)
 - Validates A/B/C/D answer format (exactly 4 keys required)
@@ -387,6 +387,26 @@ Every source file must start with:
 - Default values for score tracking: `total_score=0`, `daily_scores={}`, `completed_days=set()`, `current_question_index={}`
 - Uses `field(default_factory=...)` for all mutable defaults
 - 100% test coverage (10 test cases)
+
+### LeaderboardEntry Model (`src/models/leaderboard.py`)
+- Simple dataclass for leaderboard display and "find my rank" functionality
+- Fields: rank (int), display_name (str), total_score (int), daily_scores (dict[str, int]), email (str)
+- Used for aggregating player performance across all days
+- 100% test coverage (3 test cases)
+
+### EventConfig Model (`src/models/config.py`)
+- **Workflow-essential fields only** (API/UI fields deferred to Phase 4)
+- Date/timing fields: start_date, end_date, day_start_time, day_end_time, timezone
+- Questions: questions_file_path, questions_per_day
+- Feature flags: show_correct_answer, require_work_email
+- S3 export: s3_bucket_name, s3_region
+- Three validators:
+  - `validate_dates()`: Ensures end_date >= start_date (allows single-day events)
+  - `validate_timezone()`: Validates IANA timezone with ZoneInfo
+  - `validate_questions_per_day()`: Ensures positive integer (> 0)
+- Helper method: `get_all_dates()` returns list[date] from start to end (inclusive)
+- 100% test coverage (9 test cases)
+- **Design Decision**: API/UI fields (title, description, colors, messages) will be added in Phase 4 when implementing the API layer. This follows TDD principles: only implement what's needed for the current phase.
 
 ## Reference Projects
 

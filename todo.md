@@ -32,13 +32,13 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 4: Core Data Models - LeaderboardEntry and EventConfig
-- [ ] Write LeaderboardEntry tests
-- [ ] Implement LeaderboardEntry dataclass
-- [ ] Write EventConfig tests (date validation, timezone validation, color format)
-- [ ] Implement EventConfig dataclass with all fields from spec
-- [ ] Add validators for dates, timezone, questions_per_day
-- [ ] Add get_all_dates() helper method to EventConfig
-- [ ] Verify tests pass and run just check
+- [x] Write LeaderboardEntry tests
+- [x] Implement LeaderboardEntry dataclass
+- [x] Write EventConfig tests (date validation, timezone validation, questions_per_day)
+- [x] Implement EventConfig dataclass with workflow-essential fields only
+- [x] Add validators for dates, timezone, questions_per_day
+- [x] Add get_all_dates() helper method to EventConfig
+- [x] Verify tests pass and run just check
 
 ---
 
@@ -327,14 +327,14 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 ## Overall Progress
 
-**Phase 1: Project Foundation** - 3/4 steps complete (75%)
+**Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 0/4 steps complete (0%)
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 3/35 steps complete (9%)**
+**Total Progress: 4/35 steps complete (11%)**
 
 ---
 
