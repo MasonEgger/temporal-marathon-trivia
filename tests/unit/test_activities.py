@@ -850,3 +850,303 @@ class TestEmailActivities:
         )
 
         assert result is False
+
+
+class TestExportActivities:
+    """Tests for ExportActivities (Step 8)."""
+
+    def test_export_daily_csv_to_s3_creates_csv_with_correct_format(self) -> None:
+        """Test that export_daily_csv_to_s3() creates CSV with correct format."""
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+        from tests.fixtures.players import create_test_players
+
+        # Use moto to mock S3
+        with mock_aws():
+            import boto3
+
+            # Create mock S3 bucket
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            # Get test players
+            players = create_test_players()
+
+            # Run activity
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            result = activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                players,
+                ["2025-03-10", "2025-03-11", "2025-03-12"],
+            )
+
+            # Verify S3 URL is returned
+            assert isinstance(result, str)
+            assert "marathon-trivia-2025-03-12.csv" in result
+
+            # Get CSV from S3
+            response = s3_client.get_object(
+                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
+            )
+            csv_content = response["Body"].read().decode("utf-8")
+
+            # Verify CSV format (has header and 3 data rows)
+            lines = csv_content.strip().split("\n")
+            assert len(lines) == 4  # 1 header + 3 players
+
+    def test_export_daily_csv_to_s3_includes_all_players(self) -> None:
+        """Test that CSV includes all players."""
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+        from tests.fixtures.players import create_test_players
+
+        with mock_aws():
+            import boto3
+
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            players = create_test_players()
+
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                players,
+                ["2025-03-10", "2025-03-11", "2025-03-12"],
+            )
+
+            # Get CSV from S3
+            response = s3_client.get_object(
+                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
+            )
+            csv_content = response["Body"].read().decode("utf-8")
+
+            # Verify all 3 players are in CSV
+            assert "john.doe@example.com" in csv_content
+            assert "alice.smith@example.com" in csv_content
+            assert "bob.adams@example.com" in csv_content
+
+    def test_export_daily_csv_to_s3_has_correct_columns(self) -> None:
+        """Test that CSV columns match spec.
+
+        Columns: email, first_name, last_name, total_score, dayN_score, completed_days.
+        """
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+        from tests.fixtures.players import create_test_players
+
+        with mock_aws():
+            import boto3
+
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            players = create_test_players()
+
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                players,
+                ["2025-03-10", "2025-03-11", "2025-03-12"],
+            )
+
+            # Get CSV from S3
+            response = s3_client.get_object(
+                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
+            )
+            csv_content = response["Body"].read().decode("utf-8")
+
+            # Verify header row has correct columns
+            header = csv_content.split("\n")[0]
+            assert "email" in header
+            assert "first_name" in header
+            assert "last_name" in header
+            assert "total_score" in header
+            assert "day1_score" in header
+            assert "day2_score" in header
+            assert "day3_score" in header
+            assert "completed_days" in header
+
+    def test_export_daily_csv_to_s3_has_dynamic_day_columns(self) -> None:
+        """Test that CSV day columns are dynamic based on event dates."""
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+        from tests.fixtures.players import create_test_players
+
+        with mock_aws():
+            import boto3
+
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            players = create_test_players()
+
+            # Test with 2 days only
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                players,
+                ["2025-03-10", "2025-03-11"],  # Only 2 days
+            )
+
+            # Get CSV from S3
+            response = s3_client.get_object(
+                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
+            )
+            csv_content = response["Body"].read().decode("utf-8")
+
+            # Verify header row has only 2 day columns
+            header = csv_content.split("\n")[0]
+            assert "day1_score" in header
+            assert "day2_score" in header
+            assert "day3_score" not in header  # Should not exist
+
+    def test_export_daily_csv_to_s3_uploads_to_s3_with_correct_key(self) -> None:
+        """Test that export_daily_csv_to_s3() uploads to S3 with correct key format.
+
+        Key format: marathon-trivia-{date}.csv
+        """
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+        from tests.fixtures.players import create_test_players
+
+        with mock_aws():
+            import boto3
+
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            players = create_test_players()
+
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                players,
+                ["2025-03-10", "2025-03-11", "2025-03-12"],
+            )
+
+            # Verify object exists with correct key
+            response = s3_client.head_object(
+                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
+            )
+            assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
+
+    def test_export_daily_csv_to_s3_returns_s3_url(self) -> None:
+        """Test that export_daily_csv_to_s3() returns S3 URL."""
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+        from tests.fixtures.players import create_test_players
+
+        with mock_aws():
+            import boto3
+
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            players = create_test_players()
+
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            result = activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                players,
+                ["2025-03-10", "2025-03-11", "2025-03-12"],
+            )
+
+            # Verify S3 URL format
+            expected_url = "https://test-bucket.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
+            assert result == expected_url
+
+    def test_export_daily_csv_to_s3_handles_empty_player_list(self) -> None:
+        """Test that export_daily_csv_to_s3() handles empty player list gracefully."""
+        from moto import mock_aws
+
+        from src.activities.export import ExportActivities
+
+        with mock_aws():
+            import boto3
+
+            s3_client = boto3.client("s3", region_name="us-west-2")
+            bucket_name = "test-bucket"
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": "us-west-2"},
+            )
+
+            activity_env = ActivityEnvironment()
+            activities = ExportActivities()
+            result = activity_env.run(
+                activities.export_daily_csv_to_s3,
+                bucket_name,
+                "us-west-2",
+                "2025-03-12",
+                [],  # Empty player list
+                ["2025-03-10", "2025-03-11", "2025-03-12"],
+            )
+
+            # Should return S3 URL
+            assert isinstance(result, str)
+            assert "marathon-trivia-2025-03-12.csv" in result
+
+            # Get CSV from S3
+            response = s3_client.get_object(
+                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
+            )
+            csv_content = response["Body"].read().decode("utf-8")
+
+            # Should have header only
+            lines = csv_content.strip().split("\n")
+            assert len(lines) == 1  # Just header, no data rows

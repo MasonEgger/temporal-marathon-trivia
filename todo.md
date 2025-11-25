@@ -69,13 +69,13 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 8: S3 CSV Export Activity
-- [ ] Write CSV export tests (format, columns, S3 upload, empty list)
-- [ ] Create test fixtures for players (create_test_player, create_test_players)
-- [ ] Implement export_daily_csv_to_s3() activity
-- [ ] Write integration test with moto for S3
-- [ ] Make integration test pass
-- [ ] Refactor with retry logic and error handling
-- [ ] Verify tests pass and run just check
+- [x] Write CSV export tests (format, columns, S3 upload, empty list)
+- [x] Create test fixtures for players (create_test_player, create_test_players)
+- [x] Implement export_daily_csv_to_s3() activity
+- [x] Write integration test with moto for S3
+- [x] Make integration test pass
+- [x] Refactor with retry logic and error handling
+- [x] Verify tests pass and run just check
 
 ---
 
@@ -328,13 +328,13 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 ## Overall Progress
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
-**Phase 2: Configuration and Question Loading** - 3/4 steps complete (75%)
+**Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 7/35 steps complete (20%)**
+**Total Progress: 8/35 steps complete (23%)**
 
 ---
 

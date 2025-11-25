@@ -293,7 +293,7 @@ The application **fails fast** if:
 ### Manual Recovery
 
 - **Entity workflow corruption**: Manual recovery required (acceptable for trade show use case)
-- **Activity failures**: S3 upload retries 3x with exponential backoff, then logs error
+- **Activity failures**: Temporal handles automatic retries - do NOT implement manual retry logic in activities
 
 ## Git Workflow
 
@@ -309,9 +309,9 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 2 in progress - 7/35 steps complete (20% total progress)
+**Current Status**: Phase 2 complete - 8/35 steps complete (23% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
-- Phase 2 (Configuration and Question Loading): 75% complete (Steps 5-7 done)
+- Phase 2 (Configuration and Question Loading): 100% complete ✅
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -463,6 +463,35 @@ Every source file must start with:
    - Invalid formats, missing required fields
    - Aim for 95%+ coverage on activities (critical for workflows)
 
+6. **Activity Logging** ⚠️
+   ```python
+   # CORRECT - activity.logger is a property
+   activity.logger.info("Starting operation...")
+
+   # WRONG - Don't call it like a method
+   activity.logger().info("message")  # This will fail!
+   ```
+   - Use `activity.logger` (property) not `activity.logger()` (method)
+   - Logs integrate with Temporal's observability system
+   - Visible in Temporal UI for debugging
+
+7. **Automatic Retry Handling** ⚠️
+   ```python
+   # WRONG - Do NOT add manual retry logic
+   for attempt in range(3):
+       try:
+           s3_client.put_object(...)
+       except:
+           time.sleep(2**attempt)  # Bad!
+
+   # CORRECT - Let Temporal handle retries
+   s3_client.put_object(...)  # Temporal retries on failure
+   ```
+   - **Temporal automatically retries activities** based on retry policy
+   - Manual retry logic defeats the purpose of using Temporal
+   - Configure retry policies at workflow level when calling activities
+   - Trust the framework - this is a core Temporal feature
+
 ### Activity Implementation Checklist
 
 Before implementing an activity, ask:
@@ -495,7 +524,7 @@ def test_load_event_config():
     assert isinstance(result, EventConfig)
 ```
 
-## Activities Implemented (Phase 2: 75% Complete)
+## Activities Implemented (Phase 2: 100% Complete)
 
 ### ConfigActivities (`src/activities/config.py`)
 - **Method**: `load_event_config(config_path: str) -> EventConfig`
@@ -525,6 +554,21 @@ def test_load_event_config():
 - **Testing**: 10 comprehensive tests using `ActivityEnvironment`
 - **Coverage**: 88.89% (18 statements, 2 missed - only generic exception handler)
 - **Key Design**: Returns bool (True if valid, False otherwise) rather than raising exceptions
+
+### ExportActivities (`src/activities/export.py`)
+- **Method**: `export_daily_csv_to_s3(bucket: str, region: str, date: str, players: list[Player], event_dates: list[str]) -> str`
+- **Pattern**: Synchronous (blocking I/O with `boto3`)
+- **CSV generation**: In-memory CSV using `io.StringIO` with dynamic day columns
+- **S3 upload**: Uses boto3 client to upload CSV to S3
+- **Logging**: Uses `activity.logger` (property) for Temporal-integrated logging
+- **Retry handling**: Lets Temporal handle retries automatically (no manual retry logic)
+- **Error handling**: Raises exceptions on failure, Temporal retries as configured
+- **Testing**: 7 unit tests + 1 integration test using `ActivityEnvironment` and `moto` for S3 mocking
+- **Coverage**: 100% (30 statements, 0 missed)
+- **Key Design**:
+  - Returns S3 URL for logging/tracking
+  - Dynamic day columns based on event_dates parameter
+  - Works with moto for reliable testing without AWS credentials
 
 ## Reference Projects
 
