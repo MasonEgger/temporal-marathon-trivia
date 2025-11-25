@@ -52,9 +52,30 @@ PlayerEntityWorkflow (entity, per player)
 
 ## Development Commands
 
-All commands reference patterns from `temporal-trivia-python` (see Justfile when implemented):
+**Python 3.14+ required**. All dependencies managed with `uv`.
 
-### Running Services
+### Essential Commands (Currently Implemented)
+```bash
+just check        # Run all checks: lint + typecheck + test (use before commits)
+just test         # Run all tests with pytest and coverage
+just test-unit    # Run unit tests only (tests/unit/)
+just test-integration  # Run integration tests only (tests/integration/)
+just lint         # Run ruff linter on src/ and tests/
+just format       # Format code with ruff
+just typecheck    # Run mypy --strict on src/
+
+# Run single test file
+uv run pytest tests/unit/test_models.py -v
+
+# Run single test case
+uv run pytest tests/unit/test_models.py::TestQuestionModel::test_question_with_valid_data_creates_successfully -v
+
+# Install/update dependencies
+uv sync               # Install production dependencies
+uv sync --extra dev   # Install dev dependencies (required for testing)
+```
+
+### Running Services (Future - Not Yet Implemented)
 ```bash
 just dev           # Start all services (Temporal, Redis, worker, API)
 just worker        # Run Temporal worker only
@@ -67,32 +88,14 @@ uv run python src/worker.py
 uv run uvicorn src.api.main:app --reload
 ```
 
-### Testing
-```bash
-just test              # Run all tests with pytest
-just test-unit         # Run unit tests only
-just test-integration  # Run integration tests only
-just coverage          # Run tests with coverage report (minimum 80%)
-
-# Run single test
-uv run pytest tests/unit/test_workflows.py::test_player_workflow_tracks_score -v
-```
-
-### Linting & Type Checking
-```bash
-just lint       # Run ruff linter
-just format     # Run ruff formatter
-just typecheck  # Run mypy --strict type checker
-```
-
-### Docker
+### Docker (Future - Not Yet Implemented)
 ```bash
 just build  # Build Docker image
 just up     # Start Docker Compose stack
 just down   # Stop Docker Compose stack
 ```
 
-### Data Operations
+### Data Operations (Future - Not Yet Implemented)
 ```bash
 just export-csv        # Manually trigger CSV export for today
 just validate-config   # Validate TOML and questions JSON schemas
@@ -174,9 +177,10 @@ async def submit_answer(...) -> HTMLResponse:
 
 ### Test Organization
 
-- **Unit tests**: Individual workflows, activities, models, API endpoints
-- **Integration tests**: Full player journeys, multi-day flows, leaderboard aggregation
+- **Unit tests** (`tests/unit/`): Individual workflows, activities, models, API endpoints
+- **Integration tests** (`tests/integration/`): Full player journeys, multi-day flows, leaderboard aggregation
 - **End-to-end tests**: Complete event lifecycle with time-based transitions
+- **Test directories do NOT have `__init__.py`** files (prevents pytest import conflicts)
 
 Example test names:
 - `test_player_workflow_tracks_score()`
@@ -298,13 +302,60 @@ The application **fails fast** if:
 - Keep commits focused and atomic
 - Write descriptive commit messages explaining "why", not "what"
 
+## Implementation Plan
+
+This project follows a strict **35-step TDD implementation plan**:
+- **plan.md**: 1,743 lines with detailed RED-GREEN-REFACTOR instructions for each step
+- **todo.md**: Progress tracking with checkboxes and completion percentages
+- **.ai-sessions/**: Session summaries documenting progress and learnings
+
+**Current Status**: Phase 1, Step 2 complete (2/35 steps, 6% complete)
+
+When working on this project:
+1. Read the appropriate step in `plan.md` for detailed instructions
+2. Follow the numbered sub-instructions exactly (file paths, test scenarios, etc.)
+3. Use strict TDD: Write tests first (RED), implement minimally (GREEN), then refactor
+4. Update `todo.md` when completing tasks
+5. Focus tests on YOUR application logic, not framework behavior
+6. **CRITICAL**: Keep all `__init__.py` files EMPTY (Python best practice)
+
 ## Documentation
 
 - **spec.md**: Complete technical specification (13,000+ words)
-- **docs/api/**: Endpoint docs, workflow architecture, data models
-- **docs/how-to/**: Setup, deployment, event creation, troubleshooting
+- **plan.md**: 35-step TDD implementation plan with detailed instructions
+- **todo.md**: Progress tracking with checkboxes
+- **docs/api/**: Endpoint docs, workflow architecture, data models (to be created)
+- **docs/how-to/**: Setup, deployment, event creation, troubleshooting (to be created)
 - All functions/workflows must have comprehensive docstrings
 - File headers: `# ABOUTME: <2-line description of file purpose>`
+
+## Code Style and Best Practices
+
+### Python Module Structure
+- **NEVER put anything in `__init__.py` files** - Keep them completely empty
+- Use explicit imports: `from src.models.question import Question`
+- This prevents import conflicts and makes module structure clearer
+
+### Type Hints and Validation
+- Use `mypy --strict` mode - **no `Any` types allowed**
+- All functions must have complete type hints
+- Pydantic dataclasses for validation (not regular dataclasses)
+- Use `@field_validator` for single-field validation
+- Use `@model_validator(mode="after")` for cross-field validation
+
+### File Headers
+Every source file must start with:
+```python
+# ABOUTME: Brief description of file purpose.
+# Second line with additional context if needed.
+```
+
+### Testing Principles
+- Focus on testing YOUR application logic, not framework behavior
+- Don't test pydantic validation framework itself
+- Don't test that Temporal SDK works correctly
+- Test your validation rules, business logic, and data transformations
+- Test directories do NOT have `__init__.py` files
 
 ## Reference Projects
 

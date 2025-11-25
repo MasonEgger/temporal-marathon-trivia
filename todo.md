@@ -18,18 +18,16 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify setup (run just check)
 
 ### Step 2: Core Data Models - Question
-- [ ] Write Question model tests (valid data, options validation, correct_answer validation)
-- [ ] Implement Question dataclass with pydantic validation
-- [ ] Add validators for A/B/C/D format and correct_answer
-- [ ] Update src/models/__init__.py exports
-- [ ] Refactor validation error messages
-- [ ] Verify tests pass and run just check
+- [x] Write Question model tests (valid data, options validation, correct_answer validation)
+- [x] Implement Question dataclass with pydantic validation
+- [x] Add validators for A/B/C/D format and correct_answer
+- [x] Refactor validation error messages
+- [x] Verify tests pass and run just check
 
 ### Step 3: Core Data Models - Player
 - [ ] Write Player model tests (creation, display_name, email validation)
 - [ ] Implement Player dataclass with fields and defaults
 - [ ] Add get_display_name() method with "FirstName L." format
-- [ ] Update src/models/__init__.py exports
 - [ ] Refactor with helper methods if needed
 - [ ] Verify tests pass and run just check
 
@@ -39,7 +37,6 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [ ] Write EventConfig tests (date validation, timezone validation, color format)
 - [ ] Implement EventConfig dataclass with all fields from spec
 - [ ] Add validators for dates, timezone, questions_per_day
-- [ ] Update src/models/__init__.py exports
 - [ ] Add get_all_dates() helper method to EventConfig
 - [ ] Verify tests pass and run just check
 
@@ -62,14 +59,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [ ] Implement get_questions_for_day() activity
 - [ ] Write validate_questions_file() tests
 - [ ] Implement validate_questions_file() activity
-- [ ] Update src/activities/__init__.py exports
 - [ ] Refactor with caching if needed
 - [ ] Verify tests pass and run just check
 
 ### Step 7: Email Validation Activity
 - [ ] Write email validation tests (valid email, consumer domains, invalid format)
 - [ ] Implement validate_email() activity with regex and domain blocking
-- [ ] Update src/activities/__init__.py exports
 - [ ] Refactor domain validation (case-insensitive)
 - [ ] Verify tests pass and run just check
 
@@ -77,7 +72,6 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [ ] Write CSV export tests (format, columns, S3 upload, empty list)
 - [ ] Create test fixtures for players (create_test_player, create_test_players)
 - [ ] Implement export_daily_csv_to_s3() activity
-- [ ] Update src/activities/__init__.py exports
 - [ ] Write integration test with moto for S3
 - [ ] Make integration test pass
 - [ ] Refactor with retry logic and error handling
@@ -93,7 +87,7 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [ ] Implement PlayerEntityWorkflow with basic structure
 - [ ] Add workflow.run method with player initialization
 - [ ] Add workflow.query methods (get_current_state, get_score_for_day, has_completed_day)
-- [ ] Update src/workflows/__init__.py exports
+
 - [ ] Refactor with proper type hints
 - [ ] Verify tests pass and run just check
 
@@ -117,7 +111,6 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [ ] Implement DailyWorkflow with basic structure
 - [ ] Add workflow.run method with daily state initialization
 - [ ] Add workflow.query methods (get_daily_leaderboard, is_day_active)
-- [ ] Update src/workflows/__init__.py exports
 - [ ] Refactor with timezone support
 - [ ] Verify tests pass and run just check
 
@@ -136,7 +129,6 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [ ] Implement EventWorkflow with basic structure
 - [ ] Add workflow.run method with config loading
 - [ ] Add workflow.query method (get_event_status)
-- [ ] Update src/workflows/__init__.py exports
 - [ ] Refactor with error handling for config loading
 - [ ] Verify tests pass and run just check
 
@@ -335,14 +327,14 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 ## Overall Progress
 
-**Phase 1: Project Foundation** - 1/4 steps complete (25%)
+**Phase 1: Project Foundation** - 2/4 steps complete (50%)
 **Phase 2: Configuration and Question Loading** - 0/4 steps complete (0%)
 **Phase 3: Workflow Implementation** - 0/8 steps complete (0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 1/35 steps complete (3%)**
+**Total Progress: 2/35 steps complete (6%)**
 
 ---
 

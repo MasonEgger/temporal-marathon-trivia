@@ -80,7 +80,7 @@ addopts = [
     "--cov=src",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=0",  # Set to 0 for initial setup, will be 80 once we have code
+    "--cov-fail-under=80",  # Minimum 80% test coverage required
 ]
 
 [tool.coverage.run]
