@@ -1680,3 +1680,117 @@ class TestPlayerLookupEndpoint:
         assert response.status_code == 200  # HTMX pattern
         assert "text/html" in response.headers["content-type"]
         assert "error" in response.text.lower()
+
+
+class TestLandingPage:
+    """Tests for GET / landing page endpoint.
+
+    Tests that landing page renders correctly for both first-time
+    and returning players with proper template context.
+    """
+
+    def test_landing_page_without_cookie_shows_join_form(self) -> None:
+        """Test that GET / without cookie shows registration form.
+
+        This tests OUR application logic - showing join form for first-time visitors.
+        """
+        from datetime import date
+
+        from src.api.main import app
+        from src.models.config import EventConfig
+        from src.models.ux_config import UXConfig
+
+        # Mock config
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.title = "Test Trivia"
+        mock_ux_config.description = "Test Description"
+        mock_ux_config.primary_color = "#3b82f6"
+        mock_ux_config.secondary_color = "#8b5cf6"
+        mock_ux_config.background_color = "#ffffff"
+        mock_ux_config.text_color = "#000000"
+
+        mock_event_config = MagicMock(spec=EventConfig)
+        mock_event_config.get_all_dates.return_value = [
+            date(2025, 3, 10),
+            date(2025, 3, 11),
+        ]
+
+        app.state.ux_config = mock_ux_config
+        app.state.config = mock_event_config
+
+        client = TestClient(app)
+        response = client.get("/")  # No cookie
+
+        # Verify response is HTML
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+        # Verify join form is present
+        assert "Join the Trivia Challenge" in response.text
+        assert 'name="first_name"' in response.text
+        assert 'name="last_name"' in response.text
+        assert 'name="email"' in response.text
+        assert 'hx-post="/api/join"' in response.text
+
+    def test_landing_page_with_cookie_shows_game_interface(self) -> None:
+        """Test that GET / with cookie shows day buttons and leaderboard.
+
+        This tests OUR application logic - showing game interface for returning players.
+        """
+        from datetime import date
+
+        from src.api.main import app
+        from src.models.config import EventConfig
+        from src.models.player import Player
+        from src.models.state import PlayerState
+        from src.models.ux_config import UXConfig
+
+        # Mock config
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.title = "Test Trivia"
+        mock_ux_config.description = "Test Description"
+        mock_ux_config.primary_color = "#3b82f6"
+        mock_ux_config.secondary_color = "#8b5cf6"
+        mock_ux_config.background_color = "#ffffff"
+        mock_ux_config.text_color = "#000000"
+
+        mock_event_config = MagicMock(spec=EventConfig)
+        mock_event_config.get_all_dates.return_value = [
+            date(2025, 3, 10),
+            date(2025, 3, 11),
+        ]
+
+        app.state.ux_config = mock_ux_config
+        app.state.config = mock_event_config
+
+        # Mock Temporal client
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        mock_player_state = PlayerState(
+            player=Player(
+                id="player-123",
+                email="test@example.com",
+                first_name="Test",
+                last_name="User",
+                completed_days={"2025-03-10"},
+            ),
+            current_day=None,
+            current_question_index=0,
+        )
+        mock_handle.query = AsyncMock(return_value=mock_player_state)
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+        response = client.get("/", cookies={"player_id": "player-123"})
+
+        # Verify response is HTML
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+
+        # Verify game interface is present
+        assert "Select a Day" in response.text
+        assert "Leaderboard" in response.text
+        assert 'hx-get="/api/leaderboard"' in response.text
+        assert 'hx-trigger="load, every 30s"' in response.text
+        assert "Find My Rank" in response.text

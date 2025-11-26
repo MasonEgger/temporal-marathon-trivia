@@ -349,12 +349,12 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 4 complete - 22/35 steps complete (62.9% total progress)
+**Current Status**: Phase 5 in progress - 23/35 steps complete (65.7% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
 - Phase 4 (API Layer): 100% complete ✅
-- Phase 5 (Frontend and Integration): 0% complete (next phase)
+- Phase 5 (Frontend and Integration): 20% complete (1/5 steps - Step 23 Landing Page ✅)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -1211,6 +1211,123 @@ await redis.set(cache_key, value, ex=30)
 - `await temporal_client.get_workflow_handle(...).execute_update(...)`
 
 **From Step 22**: This is a common gotcha when working with async/await patterns.
+
+## Frontend Implementation (Phase 5: Step 23 Complete)
+
+### Templates Architecture
+
+The frontend uses **HTMX + Tailwind CSS** for a minimal-JavaScript approach suitable for trade show kiosks.
+
+**Key Pattern**: Server returns HTML fragments (not JSON), HTMX swaps them into the DOM.
+
+### Templates Implemented (Step 23)
+
+#### base.html (`frontend/templates/base.html`)
+- HTML5 base layout with responsive viewport
+- Tailwind CSS 3.x via CDN (no build step)
+- HTMX 1.9.10 for dynamic updates
+- CSS custom properties from UXConfig:
+  ```css
+  :root {
+      --color-primary: {{ config.primary_color }};
+      --color-secondary: {{ config.secondary_color }};
+      --color-background: {{ config.background_color }};
+      --color-text: {{ config.text_color }};
+  }
+  ```
+- Block structure: `{% block content %}`, `{% block extra_head %}`, `{% block extra_scripts %}`
+- High contrast mode for accessibility
+
+#### landing.html (`frontend/templates/landing.html`)
+- **Conditional rendering** based on `player_id` cookie:
+  - **No cookie**: Registration form with HTMX submission (`hx-post="/api/join"`)
+  - **Has cookie**: Game interface with day buttons + auto-refresh leaderboard
+- Auto-refreshing leaderboard: `hx-trigger="load, every 30s"`
+- "Find My Rank" button with player highlighting
+- Responsive grid: 1 col mobile → 3 cols tablet → 5 cols desktop
+
+#### day-button.html (`frontend/templates/components/day-button.html`)
+- **Reusable component** with state-based styling:
+  - **Completed**: Green, checkmark, disabled
+  - **Active**: Primary color, "Play Now", HTMX-enabled
+  - **Inactive**: Gray, "Not Available", disabled
+- **Important**: Parent template must set `day_num` and `date_str` before include:
+  ```jinja2
+  {% for date in event_dates %}
+      {% set day_num = loop.index %}
+      {% set date_str = date.isoformat() %}
+      {% include "components/day-button.html" %}
+  {% endfor %}
+  ```
+
+### Landing Page Route (`GET /` in src/api/main.py`)
+
+```python
+@app.get("/", response_class=HTMLResponse)
+async def landing_page(
+    request: Request,
+    player_id: str | None = Cookie(None),
+) -> HTMLResponse:
+    # Get configs from app.state (loaded at startup)
+    config = request.app.state.ux_config
+    event_config = request.app.state.config
+
+    if player_id:
+        # Query PlayerEntityWorkflow for completed days (with fallback)
+        # Add event_dates, current_date, player_completed_days to context
+
+    return templates.TemplateResponse(request, "landing.html", context)
+```
+
+**Pattern**: Conditional logic in route handler, templates stay simple.
+
+### TemplateResponse API (Updated Step 23)
+
+**New API format** (positional parameters):
+```python
+# Current (use this)
+templates.TemplateResponse(request, "template.html", {"key": "value"})
+
+# Deprecated (old format with warnings)
+templates.TemplateResponse(name="template.html", context={"request": request, ...})
+```
+
+**Applied to all routes**: gameplay.py, leaderboard.py, player.py, main.py (17 occurrences updated)
+
+### Jinja2 Template Patterns
+
+**Template Variable Scope**:
+- `{% include %}` does NOT pass loop context automatically
+- Parent template must set variables before including:
+  ```jinja2
+  {% for item in items %}
+      {% set loop_var = loop.index %}
+      {% include "component.html" %}
+  {% endfor %}
+  ```
+
+**Template Composition**:
+- base.html: Layout + external dependencies
+- Page templates: Structure + conditionals
+- Component templates: Reusable pieces (need explicit variable passing)
+
+### Testing Frontend
+
+**Test OUR application logic** (not framework rendering):
+```python
+def test_landing_page_without_cookie_shows_join_form():
+    # Mock app.state.ux_config and app.state.config
+    response = client.get("/")
+
+    # Assert on HTML content presence
+    assert "Join the Trivia Challenge" in response.text
+    assert 'name="first_name"' in response.text
+```
+
+**Don't test**:
+- Jinja2 template rendering engine
+- Tailwind CSS application
+- HTMX behavior
 
 ## Workflows Implemented (Phase 3: 100% Complete)
 

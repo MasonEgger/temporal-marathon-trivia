@@ -52,9 +52,9 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
             event_dates = sorted(leaderboard_entries[0].daily_scores.keys())
 
         return templates.TemplateResponse(
-            request=request,
-            name="components/leaderboard.html",
-            context={
+            request,
+            "components/leaderboard.html",
+            {
                 "leaderboard": leaderboard_entries,
                 "event_dates": event_dates,
             },
@@ -99,9 +99,9 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
 
     # Render template
     return templates.TemplateResponse(
-        request=request,
-        name="components/leaderboard.html",
-        context={
+        request,
+        "components/leaderboard.html",
+        {
             "leaderboard": aggregated_leaderboard,
             "event_dates": event_dates,
         },

@@ -1,0 +1,36 @@
+<!-- Day Button Component - Displays state: active, completed, or inactive -->
+<!-- Note: day_num and date_str must be set by parent template before including -->
+
+<!-- Determine button state -->
+{% if date_str in player_completed_days %}
+    {% set button_state = "completed" %}
+    {% set button_class = "bg-green-500 text-white cursor-default" %}
+    {% set button_disabled = true %}
+    {% set button_text = "✓ Completed" %}
+{% elif date == current_date %}
+    {% set button_state = "active" %}
+    {% set button_class = "btn-primary text-white cursor-pointer hover:opacity-90" %}
+    {% set button_disabled = false %}
+    {% set button_text = "Play Now" %}
+{% else %}
+    {% set button_state = "inactive" %}
+    {% set button_class = "bg-gray-300 text-gray-500 cursor-not-allowed" %}
+    {% set button_disabled = true %}
+    {% set button_text = "Not Available" %}
+{% endif %}
+
+<div class="day-button-container">
+    <button
+        {% if not button_disabled %}
+            hx-get="/api/day/{{ date_str }}/start"
+            hx-target="#main"
+            hx-swap="innerHTML"
+        {% endif %}
+        class="w-full {{ button_class }} py-4 px-6 rounded-lg font-semibold text-center transition shadow-md"
+        {% if button_disabled %}disabled{% endif %}
+    >
+        <div class="text-sm font-bold mb-1">Day {{ day_num }}</div>
+        <div class="text-xs">{{ date.strftime('%b %d') }}</div>
+        <div class="text-sm mt-2">{{ button_text }}</div>
+    </button>
+</div>

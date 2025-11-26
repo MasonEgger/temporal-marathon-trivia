@@ -216,12 +216,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 ## Phase 5: Frontend and Integration
 
 ### Step 23: Frontend Templates - Landing Page
-- [ ] Create base.html template with Tailwind and HTMX
-- [ ] Create landing.html template (join form and returning player view)
-- [ ] Create day-button.html component
-- [ ] Add GET / landing page route to main.py
-- [ ] Write landing page rendering tests
-- [ ] Verify templates render correctly
+- [x] Create base.html template with Tailwind and HTMX
+- [x] Create landing.html template (join form and returning player view)
+- [x] Create day-button.html component
+- [x] Add GET / landing page route to main.py
+- [x] Write landing page rendering tests
+- [x] Verify templates render correctly with just check (161 tests, 89.86% coverage)
 
 ### Step 24: Frontend Styling with Tailwind
 - [ ] Update base.html with Tailwind configuration and custom colors
@@ -342,10 +342,10 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 8/8 steps complete (100%) ✅
 **Phase 4: API Layer** - 6/6 steps complete (100%) ✅
-**Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
+**Phase 5: Frontend and Integration** - 1/5 steps complete (20%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 22/35 steps complete (62.9%)**
+**Total Progress: 23/35 steps complete (65.7%)**
 
 ---
 

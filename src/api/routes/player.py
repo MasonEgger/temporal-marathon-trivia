@@ -22,6 +22,7 @@ router = APIRouter()
 
 @router.post("/api/join")
 async def join(
+    request: Request,
     first_name: str = Form(),
     last_name: str = Form(),
     email: str = Form(),
@@ -52,20 +53,19 @@ async def join(
         handle = temporal_client.get_workflow_handle(event_id)
 
         # Call register_player update handler
-        request = RegisterPlayerRequest(
+        register_request = RegisterPlayerRequest(
             email=email,
             first_name=first_name,
             last_name=last_name,
         )
         player_id = await handle.execute_update(
             EventWorkflow.register_player,
-            request,
+            register_request,
         )
 
         # Render success template
         response = templates.TemplateResponse(
-            name="components/join-success.html",
-            context={"request": {}, "player_id": player_id},
+            request, "components/join-success.html", {"player_id": player_id}
         )
 
         # Set player_id cookie
@@ -77,14 +77,12 @@ async def join(
         # Validation error from workflow (email, work domain, etc.)
         error_message = str(e)
         return templates.TemplateResponse(
-            name="components/error.html",
-            context={"request": {}, "error": error_message},
+            request, "components/error.html", {"error": error_message}
         )
     except Exception as e:
         # Unexpected error
         return templates.TemplateResponse(
-            name="components/error.html",
-            context={"request": {}, "error": f"An error occurred: {e}"},
+            request, "components/error.html", {"error": f"An error occurred: {e}"}
         )
 
 
@@ -112,8 +110,7 @@ async def get_player(
     # Manual cookie validation for HTMX pattern
     if not player_id:
         return templates.TemplateResponse(
-            name="components/error.html",
-            context={"request": request, "error": "Please register first"},
+            request, "components/error.html", {"error": "Please register first"}
         )
 
     try:
@@ -170,9 +167,9 @@ async def get_player(
 
         # Render leaderboard with highlight
         return templates.TemplateResponse(
-            name="components/leaderboard.html",
-            context={
-                "request": request,
+            request,
+            "components/leaderboard.html",
+            {
                 "leaderboard": leaderboard_entries,
                 "event_dates": event_dates,
                 "highlight_email": player_email if player_entry else None,
@@ -181,6 +178,7 @@ async def get_player(
 
     except Exception as e:
         return templates.TemplateResponse(
-            name="components/error.html",
-            context={"request": request, "error": f"Error loading leaderboard: {e}"},
+            request,
+            "components/error.html",
+            {"error": f"Error loading leaderboard: {e}"},
         )

@@ -43,6 +43,7 @@ async def start_day(
         # We do this manually instead of Cookie(...) to return HTMX-friendly error HTML
         if not player_id:
             return templates.TemplateResponse(
+                request,
                 name="components/error.html",
                 context={
                     "request": request,
@@ -67,6 +68,7 @@ async def start_day(
 
         # Render question template with question data
         return templates.TemplateResponse(
+            request,
             name="components/question.html",
             context={
                 "request": request,
@@ -80,14 +82,16 @@ async def start_day(
     except ApplicationError as e:
         # Workflow validation errors (day not started, already completed, etc.)
         return templates.TemplateResponse(
+            request,
             name="components/error.html",
-            context={"request": request, "error": str(e)},
+            context={"error": str(e)},
         )
     except Exception as e:
         # Unexpected errors (network issues, etc.)
         return templates.TemplateResponse(
+            request,
             name="components/error.html",
-            context={"request": request, "error": f"An error occurred: {e}"},
+            context={"error": f"An error occurred: {e}"},
         )
 
 
@@ -125,6 +129,7 @@ async def submit_answer(
         # Validate player_id cookie is present (OUR application logic)
         if not player_id:
             return templates.TemplateResponse(
+                request,
                 name="components/error.html",
                 context={
                     "request": request,
@@ -157,6 +162,7 @@ async def submit_answer(
         if answer_result.next_question:
             # More questions remain - render next question
             return templates.TemplateResponse(
+                request,
                 name="components/question.html",
                 context={
                     "request": request,
@@ -170,6 +176,7 @@ async def submit_answer(
         else:
             # All questions answered - render completion
             return templates.TemplateResponse(
+                request,
                 name="components/completion.html",
                 context={
                     "request": request,
@@ -183,12 +190,14 @@ async def submit_answer(
     except ApplicationError as e:
         # Workflow validation errors (invalid answer_choice, etc.)
         return templates.TemplateResponse(
+            request,
             name="components/error.html",
-            context={"request": request, "error": str(e)},
+            context={"error": str(e)},
         )
     except Exception as e:
         # Unexpected errors (network issues, etc.)
         return templates.TemplateResponse(
+            request,
             name="components/error.html",
-            context={"request": request, "error": f"An error occurred: {e}"},
+            context={"error": f"An error occurred: {e}"},
         )

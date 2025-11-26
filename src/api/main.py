@@ -4,8 +4,11 @@
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import date
 
-from fastapi import FastAPI
+from fastapi import Cookie, FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from redis.asyncio import from_url
 from temporalio.client import Client
 
@@ -62,10 +65,64 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Configure Jinja2 templates
+templates = Jinja2Templates(directory="frontend/templates")
+
 # Include routers
 app.include_router(player.router)
 app.include_router(gameplay.router)
 app.include_router(leaderboard.router)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def landing_page(
+    request: Request,
+    player_id: str | None = Cookie(None),
+) -> HTMLResponse:
+    """Landing page for Marathon Trivia Platform.
+
+    Renders different views based on player registration status:
+    - First-time visitors (no cookie): Show registration form
+    - Returning players (has cookie): Show day buttons and leaderboard
+
+    Args:
+        request: FastAPI request object for template context
+        player_id: Optional player_id from cookie (None for first-time visitors)
+
+    Returns:
+        HTMLResponse with rendered landing.html template
+    """
+    # Get configuration from app state
+    config = request.app.state.ux_config
+    event_config = request.app.state.config
+
+    # Build template context
+    context = {
+        "request": request,
+        "config": config,
+        "player_id": player_id,
+    }
+
+    # If returning player, add event dates and player-specific data
+    if player_id:
+        # Get all event dates
+        event_dates = event_config.get_all_dates()
+        context["event_dates"] = event_dates
+        context["current_date"] = date.today()
+
+        # Get player's completed days
+        try:
+            from src.workflows.player import PlayerEntityWorkflow
+
+            workflow_id = player_id
+            handle = request.app.state.temporal_client.get_workflow_handle(workflow_id)
+            player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
+            context["player_completed_days"] = player_state.player.completed_days
+        except Exception:
+            # If we can't get player state, show empty completed days
+            context["player_completed_days"] = set()
+
+    return templates.TemplateResponse(request, "landing.html", context)
 
 
 @app.get("/health")

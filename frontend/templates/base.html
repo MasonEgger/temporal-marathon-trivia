@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.title }}</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX for dynamic HTML updates -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Custom CSS Variables from Config -->
+    <style>
+        :root {
+            --color-primary: {{ config.primary_color }};
+            --color-secondary: {{ config.secondary_color }};
+            --color-background: {{ config.background_color }};
+            --color-text: {{ config.text_color }};
+        }
+
+        body {
+            background-color: var(--color-background);
+            color: var(--color-text);
+        }
+
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background-color: var(--color-secondary);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            opacity: 0.9;
+        }
+
+        /* High contrast mode for accessibility and booth displays */
+        @media (prefers-contrast: high) {
+            body {
+                border: 2px solid var(--color-text);
+            }
+        }
+    </style>
+
+    <!-- Additional page-specific styles -->
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen">
+    <!-- Main content area -->
+    <div id="main" class="container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 text-sm opacity-75">
+        <p>Powered by Temporal Workflows</p>
+    </footer>
+
+    <!-- Additional page-specific scripts -->
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
