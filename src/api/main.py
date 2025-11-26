@@ -10,10 +10,10 @@ from fastapi import Cookie, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from redis.asyncio import from_url
-from temporalio.client import Client
 
 from src.activities.config import ConfigActivities
 from src.api.routes import gameplay, leaderboard, player
+from src.temporal_client import create_temporal_client
 
 
 @asynccontextmanager
@@ -37,14 +37,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.config = config_activities.load_event_config(config_path)
     app.state.ux_config = config_activities.load_ux_config(config_path)
 
-    # Startup: Connect to Temporal
-    temporal_address = os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
-    temporal_namespace = os.getenv("TEMPORAL_NAMESPACE", "default")
-
-    app.state.temporal_client = await Client.connect(
-        temporal_address,
-        namespace=temporal_namespace,
-    )
+    # Startup: Connect to Temporal (supports both local and cloud)
+    app.state.temporal_client = await create_temporal_client()
 
     # Startup: Connect to Redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")

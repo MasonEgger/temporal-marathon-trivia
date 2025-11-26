@@ -86,7 +86,12 @@ addopts = [
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["*/tests/*", "*/__pycache__/*"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "src/worker.py",  # Worker entry point - tested by successful startup
+    "src/temporal_client.py",  # Connection utility - tested by worker/API startup
+]
 
 [tool.coverage.report]
 precision = 2

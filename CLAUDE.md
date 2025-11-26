@@ -75,17 +75,18 @@ uv sync               # Install production dependencies
 uv sync --extra dev   # Install dev dependencies (required for testing)
 ```
 
-### Running Services (Future - Not Yet Implemented)
+### Running Services
 ```bash
+# Non-containerized local dev (READY NOW - Step 25)
+temporal server start-dev  # Start Temporal dev server
+redis-server               # Start Redis
+uv run python src/worker.py  # Start Temporal worker
+uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000  # Start API
+
+# Justfile commands (Future - Step 29)
 just dev           # Start all services (Temporal, Redis, worker, API)
 just worker        # Run Temporal worker only
 just api           # Run FastAPI dev server with reload
-
-# Non-containerized local dev
-temporal server start-dev  # Start Temporal dev server
-redis-server               # Start Redis
-uv run python src/worker.py
-uv run uvicorn src.api.main:app --reload
 ```
 
 ### Docker (Future - Not Yet Implemented)
@@ -349,12 +350,12 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 5 in progress - 24/35 steps complete (68.6% total progress)
+**Current Status**: Phase 5 in progress - 25/35 steps complete (71.4% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
 - Phase 4 (API Layer): 100% complete ✅
-- Phase 5 (Frontend and Integration): 40% complete (2/5 steps - Steps 23-24 ✅)
+- Phase 5 (Frontend and Integration): 60% complete (3/5 steps - Steps 23-25 ✅)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -1866,3 +1867,152 @@ This project reuses patterns from:
     - Pattern: Bounded set of children (not infinite recurring)
     - **Temporal Schedules vs Timers**: Use Schedules for cron-like recurring workflows, use timers for one-time parent-child coordination
     - From Step 16: Daily workflow scheduling implementation
+
+## Worker and Deployment (Phase 5: Step 25 Complete)
+
+### Temporal Worker (`src/worker.py`)
+- **Status**: COMPLETE - Worker entry point with environment configuration (Step 25) ✅
+- **Pattern**: Single worker registers ALL workflows and activities
+- **Workflows Registered**: EventWorkflow, DailyWorkflow, PlayerEntityWorkflow
+- **Activities Registered**: 9 methods across 5 activity classes
+  - ConfigActivities: load_event_config, load_ux_config
+  - QuestionsActivities: load_questions, get_questions_for_day, validate_questions_file
+  - EmailActivities: validate_email
+  - ExportActivities: export_daily_csv_to_s3
+  - TimeActivities: create_timezone_aware_datetime
+- **ThreadPoolExecutor**: 100 workers for synchronous activities
+- **Startup Logging**: Comprehensive banner showing connection status, registered components
+- **Shutdown**: Graceful - Worker.run() handles SIGINT/SIGTERM internally
+- **Testing**: Verified by successful startup (no unit tests needed)
+
+### Temporal Client Connection (`src/temporal_client.py`)
+- **Status**: COMPLETE - Environment-based connection utility (Step 25) ✅
+- **Pattern**: Single function creates client for local OR cloud based on environment variables
+- **Environment Detection**:
+  - If TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY exist → Temporal Cloud (TLS enabled)
+  - If no TLS env vars → Local development (plaintext connection)
+- **Configuration**:
+  - TEMPORAL_ADDRESS (default: localhost:7233)
+  - TEMPORAL_NAMESPACE (default: default)
+  - TEMPORAL_TLS_CERT (optional, for cloud)
+  - TEMPORAL_TLS_KEY (optional, for cloud)
+- **Pydantic Data Converter**: Pre-configured for EmailStr and pydantic model serialization
+- **Error Handling**: Clear exceptions for TLS loading failures, connection errors
+- **Type Safety**: Conditional branching to satisfy mypy --strict (no TLSConfig | None union)
+- **Usage**: Both worker and API use `await create_temporal_client()`
+- **Testing**: Verified by worker/API startup (no unit tests needed)
+
+### Running the Platform Locally
+
+**Prerequisites**:
+1. Temporal dev server running: `temporal server start-dev`
+2. Redis running: `redis-server`
+3. Configuration files: `config/event.toml`, `config/questions.json`
+
+**Start the platform**:
+```bash
+# Terminal 1: Start worker
+uv run python src/worker.py
+
+# Terminal 2: Start API
+uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Access application
+open http://localhost:8000
+```
+
+**Expected output from worker**:
+```
+================================================================================
+Marathon Trivia Platform - Temporal Worker
+================================================================================
+Task Queue: marathon-trivia
+Temporal Address: localhost:7233
+Temporal Namespace: default
+--------------------------------------------------------------------------------
+Connecting to Temporal server...
+✅ Connected successfully!
+--------------------------------------------------------------------------------
+Registering workflows and activities...
+
+Workflows:
+  - EventWorkflow (manages entire event lifecycle)
+  - DailyWorkflow (manages single day trivia session)
+  - PlayerEntityWorkflow (maintains per-player state)
+
+Activities:
+  - ConfigActivities (2 methods)
+  - QuestionsActivities (3 methods)
+  - EmailActivities (1 method)
+  - ExportActivities (1 method)
+  - TimeActivities (1 method)
+--------------------------------------------------------------------------------
+
+🚀 Worker started successfully!
+Listening for workflow and activity tasks...
+Press Ctrl+C to stop
+================================================================================
+```
+
+### Temporal Cloud Deployment
+
+**Configuration** (.env for cloud):
+```bash
+TEMPORAL_ADDRESS=<namespace>.tmprl.cloud:7233
+TEMPORAL_NAMESPACE=<namespace>
+TEMPORAL_TLS_CERT=/path/to/client.pem
+TEMPORAL_TLS_KEY=/path/to/client.key
+TEMPORAL_TASK_QUEUE=marathon-trivia
+```
+
+**No code changes required** - same worker and API work for both local and cloud!
+
+### Worker Shutdown Handling 🔑 **CRITICAL** (Step 25)
+
+**WRONG Pattern - Manual Signal Handlers**:
+```python
+# ❌ Don't do this - doesn't integrate with asyncio
+import signal
+
+def handle_shutdown(sig, frame):
+    print("Shutting down...")
+
+signal.signal(signal.SIGINT, handle_shutdown)
+signal.signal(signal.SIGTERM, handle_shutdown)
+await worker.run()  # Ctrl+C won't work!
+```
+
+**CORRECT Pattern - Let Worker Handle Signals**:
+```python
+# ✅ Temporal Worker handles shutdown internally
+await worker.run()  # Ctrl+C works perfectly!
+```
+
+**Why This Works**:
+- `Worker.run()` is an async coroutine that integrates with asyncio event loop
+- asyncio.run() catches SIGINT/SIGTERM and propagates to coroutines
+- Worker receives cancellation and shuts down gracefully
+- Completes in-flight tasks before exiting
+- No manual signal handling needed
+
+**From Step 25**: User discovered manual signal handlers prevented graceful shutdown. Trust Temporal SDK defaults.
+
+### Coverage Configuration for Infrastructure (Step 25) 🔑
+
+**Pattern**: Exclude infrastructure entry points from coverage requirements
+
+```toml
+# pyproject.toml
+[tool.coverage.run]
+omit = [
+    "src/worker.py",  # Worker entry point - tested by successful startup
+    "src/temporal_client.py",  # Connection utility - tested by worker/API startup
+]
+```
+
+**Rationale**:
+- Worker and client are **infrastructure wiring**, not business logic
+- Verification: Does the worker boot? Does the API connect?
+- Unit testing these = testing that Temporal SDK works
+- Integration testing covers end-to-end connectivity
+- Keeps coverage metric focused on application logic

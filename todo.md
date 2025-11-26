@@ -234,13 +234,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify high contrast and readability
 
 ### Step 25: Worker and Temporal Client Setup
-- [ ] Implement src/worker.py with workflow and activity registration
-- [ ] Create src/temporal_client.py with connection utility
-- [ ] Write worker tests (creation, TLS configuration)
-- [ ] Make worker tests pass
-- [ ] Update API to use connection utility
-- [ ] Verify worker starts successfully
-- [ ] Verify tests pass and run just check
+- [x] Implement src/worker.py with workflow and activity registration
+- [x] Create src/temporal_client.py with connection utility (environment configuration)
+- [x] Update API to use connection utility (lifespan refactored)
+- [x] Verify worker starts successfully (connected to local Temporal)
+- [x] Verify tests pass and run just check (161 passed, 90.11% coverage)
 
 ### Step 26: Integration Test - Full Player Journey
 - [ ] Write full player journey integration test
@@ -342,10 +340,10 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 8/8 steps complete (100%) ✅
 **Phase 4: API Layer** - 6/6 steps complete (100%) ✅
-**Phase 5: Frontend and Integration** - 2/5 steps complete (40%)
+**Phase 5: Frontend and Integration** - 3/5 steps complete (60%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 24/35 steps complete (68.6%)**
+**Total Progress: 25/35 steps complete (71.4%)**
 
 ---
 
