@@ -14,6 +14,7 @@ with workflow.unsafe.imports_passed_through():
     from src.activities.time import TimeActivities
     from src.models.answer import (
         CreateTimezoneAwareDatetimeRequest,
+        EventStatusResponse,
         RegisterPlayerRequest,
     )
     from src.models.question import Question
@@ -166,36 +167,33 @@ class EventWorkflow:
         self.state.daily_workflow_ids[date_str] = daily_workflow_id
 
     @workflow.query
-    def get_event_status(self) -> dict[str, str | int | dict[str, str]]:
+    def get_event_status(self) -> EventStatusResponse:
         """Query to get current event status.
 
-        Returns a dictionary containing event_id, player_count, and daily_workflow_ids
+        Returns an EventStatusResponse containing event_id, player_count, and daily_workflow_ids
         for monitoring the event progress.
 
         Returns:
-            dict with keys:
-                - event_id (str): Unique identifier for this event.
-                - player_count (int): Total number of registered players.
-                - daily_workflow_ids (dict[str, str]): Mapping of date to DailyWorkflow ID.
+            EventStatusResponse with event metadata and daily workflow IDs.
 
         Raises:
             RuntimeError: If workflow state is not initialized.
 
         Example:
             >>> status = await handle.query(EventWorkflow.get_event_status)
-            >>> print(f"Event: {status['event_id']}, Players: {status['player_count']}")
+            >>> print(f"Event: {status.event_id}, Players: {status.player_count}")
             Event: my-event, Players: 0
-            >>> print(f"Daily workflows: {len(status['daily_workflow_ids'])}")
+            >>> print(f"Daily workflows: {len(status.daily_workflow_ids)}")
             Daily workflows: 3
         """
         if self.state is None:
             raise RuntimeError("Workflow state not initialized")
 
-        return {
-            "event_id": self.state.event_id,
-            "player_count": self.state.player_count,
-            "daily_workflow_ids": self.state.daily_workflow_ids,
-        }
+        return EventStatusResponse(
+            event_id=self.state.event_id,
+            player_count=self.state.player_count,
+            daily_workflow_ids=dict(self.state.daily_workflow_ids),
+        )
 
     @workflow.update
     async def register_player(self, request: RegisterPlayerRequest) -> str:

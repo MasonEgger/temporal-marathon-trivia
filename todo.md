@@ -187,12 +187,15 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check (140 tests, 92.57% coverage)
 
 ### Step 21: API Routes - Leaderboard
-- [ ] Write leaderboard endpoint tests with Redis caching
-- [ ] Implement GET /api/leaderboard endpoint
-- [ ] Create leaderboard.html template
-- [ ] Update main.py to include leaderboard router
-- [ ] Refactor with aggregation helper function
-- [ ] Verify tests pass and run just check
+- [x] Write leaderboard endpoint tests with Redis caching
+- [x] Implement GET /api/leaderboard endpoint
+- [x] Create leaderboard.html template
+- [x] Update main.py to include leaderboard router
+- [x] Refactor with aggregation helper function
+- [x] Create EventStatusResponse dataclass for type safety
+- [x] Update EventWorkflow.get_event_status() to return EventStatusResponse
+- [x] Update all tests to use EventStatusResponse
+- [x] Verify tests pass and run just check
 
 ### Step 22: API Routes - Configuration and Player Lookup
 - [ ] Write config and player endpoints tests
@@ -332,11 +335,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 8/8 steps complete (100%) ✅
-**Phase 4: API Layer** - 4/6 steps complete (66.7%)
+**Phase 4: API Layer** - 5/6 steps complete (83.3%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 20/35 steps complete (57.1%)**
+**Total Progress: 21/35 steps complete (60.0%)**
 
 ---
 

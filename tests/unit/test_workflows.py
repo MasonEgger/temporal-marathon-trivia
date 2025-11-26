@@ -156,9 +156,7 @@ class TestPlayerEntityWorkflow:
         await asyncio.sleep(0.1)
 
         # Score for any day should be 0 initially
-        score = await handle.query(
-            PlayerEntityWorkflow.get_score_for_day, "2025-03-10"
-        )
+        score = await handle.query(PlayerEntityWorkflow.get_score_for_day, "2025-03-10")
         assert score == 0
 
     @pytest.mark.asyncio
@@ -177,9 +175,7 @@ class TestPlayerEntityWorkflow:
         await asyncio.sleep(0.1)
 
         # No days should be completed initially
-        completed = await handle.query(
-            PlayerEntityWorkflow.has_completed_day, "2025-03-10"
-        )
+        completed = await handle.query(PlayerEntityWorkflow.has_completed_day, "2025-03-10")
         assert completed is False
 
 
@@ -187,9 +183,7 @@ class TestPlayerEntityWorkflowStartDay:
     """Test suite for PlayerEntityWorkflow start_day update handler."""
 
     @pytest.mark.asyncio
-    async def test_start_day_returns_first_question(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_start_day_returns_first_question(self, client: Client, worker: Worker) -> None:
         """Test that start_day returns the first Question for the specified date."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -202,9 +196,7 @@ class TestPlayerEntityWorkflowStartDay:
         await asyncio.sleep(0.1)
 
         # Call start_day update handler
-        result = await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Should return first question
         assert isinstance(result, Question)
@@ -227,9 +219,7 @@ class TestPlayerEntityWorkflowStartDay:
         await asyncio.sleep(0.1)
 
         # Call start_day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Query state to verify current_day is set
         state = await handle.query(PlayerEntityWorkflow.get_current_state)
@@ -251,9 +241,7 @@ class TestPlayerEntityWorkflowStartDay:
         await asyncio.sleep(0.1)
 
         # Call start_day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Query state to verify current_question_index is 0
         state = await handle.query(PlayerEntityWorkflow.get_current_state)
@@ -275,9 +263,7 @@ class TestPlayerEntityWorkflowStartDay:
         await asyncio.sleep(0.1)
 
         # Start day and complete all questions
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
         await handle.execute_update(
             PlayerEntityWorkflow.submit_answer,
             SubmitAnswerRequest("2025-03-10", "q1", "B", False),
@@ -293,9 +279,7 @@ class TestPlayerEntityWorkflowStartDay:
 
         # Try to start the same day again - should raise error
         with pytest.raises(WorkflowUpdateFailedError) as exc_info:
-            await handle.execute_update(
-                PlayerEntityWorkflow.start_day, "2025-03-10"
-            )
+            await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
         assert "already completed" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
@@ -314,9 +298,7 @@ class TestPlayerEntityWorkflowStartDay:
         await asyncio.sleep(0.1)
 
         # Call start_day - if activity isn't called, this will fail
-        result = await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # If we get a result, activity was called successfully
         assert result is not None
@@ -337,9 +319,7 @@ class TestPlayerEntityWorkflowStartDay:
         await asyncio.sleep(0.1)
 
         # Call start_day
-        result = await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Verify Question structure
         assert isinstance(result, Question)
@@ -370,9 +350,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day first
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Submit correct answer (question q1, correct answer is "B")
         request = SubmitAnswerRequest(
@@ -381,9 +359,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
             answer_choice="B",  # correct
             show_correct_answer=False,
         )
-        result = await handle.execute_update(
-            PlayerEntityWorkflow.submit_answer, request
-        )
+        result = await handle.execute_update(PlayerEntityWorkflow.submit_answer, request)
 
         # Verify result
         assert isinstance(result, AnswerResult)
@@ -410,9 +386,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Submit incorrect answer (question q1, correct answer is "B", submit "A")
         request = SubmitAnswerRequest(
@@ -421,9 +395,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
             answer_choice="A",  # incorrect
             show_correct_answer=False,
         )
-        result = await handle.execute_update(
-            PlayerEntityWorkflow.submit_answer, request
-        )
+        result = await handle.execute_update(PlayerEntityWorkflow.submit_answer, request)
 
         # Verify result
         assert isinstance(result, AnswerResult)
@@ -450,9 +422,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Submit answer to first question
         request = SubmitAnswerRequest(
@@ -461,9 +431,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
             answer_choice="B",
             show_correct_answer=False,
         )
-        result = await handle.execute_update(
-            PlayerEntityWorkflow.submit_answer, request
-        )
+        result = await handle.execute_update(PlayerEntityWorkflow.submit_answer, request)
 
         # Should return next question (q2)
         assert result.next_question is not None
@@ -486,9 +454,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Answer first two questions
         await handle.execute_update(
@@ -527,9 +493,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Submit with invalid answer choice should raise error
         with pytest.raises(WorkflowUpdateFailedError) as exc_info:
@@ -555,9 +519,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day (current question is q1)
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Submit with wrong question_id should raise error
         with pytest.raises(WorkflowUpdateFailedError) as exc_info:
@@ -606,9 +568,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day and complete all questions
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
         await handle.execute_update(
             PlayerEntityWorkflow.submit_answer,
             SubmitAnswerRequest("2025-03-10", "q1", "B", False),
@@ -646,9 +606,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day and answer all questions
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
         await handle.execute_update(
             PlayerEntityWorkflow.submit_answer,
             SubmitAnswerRequest("2025-03-10", "q1", "B", False),
@@ -682,9 +640,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         await asyncio.sleep(0.1)
 
         # Start day
-        await handle.execute_update(
-            PlayerEntityWorkflow.start_day, "2025-03-10"
-        )
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
         # Answer 2 correct, 1 incorrect
         await handle.execute_update(
@@ -870,21 +826,15 @@ class TestDailyWorkflow:
         # Submit scores for 3 players with different scores
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-1", 5, "alice@example.com", "Alice", "Smith"
-            ),
+            SubmitScoreRequest("player-1", 5, "alice@example.com", "Alice", "Smith"),
         )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-2", 8, "bob@example.com", "Bob", "Johnson"
-            ),
+            SubmitScoreRequest("player-2", 8, "bob@example.com", "Bob", "Johnson"),
         )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-3", 3, "charlie@example.com", "Charlie", "Williams"
-            ),
+            SubmitScoreRequest("player-3", 3, "charlie@example.com", "Charlie", "Williams"),
         )
 
         # Query leaderboard
@@ -917,21 +867,15 @@ class TestDailyWorkflow:
         # Submit scores for 3 players, 2 with same score
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-1", 5, "alice@example.com", "Alice", "Smith"
-            ),
+            SubmitScoreRequest("player-1", 5, "alice@example.com", "Alice", "Smith"),
         )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-2", 5, "bob@example.com", "Bob", "Johnson"
-            ),
+            SubmitScoreRequest("player-2", 5, "bob@example.com", "Bob", "Johnson"),
         )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-3", 3, "charlie@example.com", "Charlie", "Williams"
-            ),
+            SubmitScoreRequest("player-3", 3, "charlie@example.com", "Charlie", "Williams"),
         )
 
         # Query leaderboard
@@ -975,9 +919,7 @@ class TestDailyWorkflow:
             )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-5", 8, "player5@example.com", "Player5", "Lastname"
-            ),
+            SubmitScoreRequest("player-5", 8, "player5@example.com", "Player5", "Lastname"),
         )
 
         # Query leaderboard
@@ -1012,21 +954,15 @@ class TestDailyWorkflow:
         # Submit scores for 3 players with same score, different names
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-1", 5, "john@example.com", "John", "Doe"
-            ),
+            SubmitScoreRequest("player-1", 5, "john@example.com", "John", "Doe"),
         )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-2", 5, "alice@example.com", "Alice", "Brown"
-            ),
+            SubmitScoreRequest("player-2", 5, "alice@example.com", "Alice", "Brown"),
         )
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-3", 5, "bob@example.com", "Bob", "Adams"
-            ),
+            SubmitScoreRequest("player-3", 5, "bob@example.com", "Bob", "Adams"),
         )
 
         # Query leaderboard
@@ -1059,9 +995,7 @@ class TestDailyWorkflow:
         # Submit score for one player
         await handle.execute_update(
             DailyWorkflow.submit_score,
-            SubmitScoreRequest(
-                "player-1", 5, "alice@example.com", "Alice", "Smith"
-            ),
+            SubmitScoreRequest("player-1", 5, "alice@example.com", "Alice", "Smith"),
         )
 
         # Query leaderboard
@@ -1114,8 +1048,8 @@ class TestEventWorkflow:
 
         # Status should contain event_id from loaded config
         assert status is not None
-        assert "event_id" in status
-        assert status["event_id"] == "test-event-123"
+
+        assert status.event_id == "test-event-123"
 
     @pytest.mark.asyncio
     async def test_event_workflow_validates_questions_file_via_activity(
@@ -1156,15 +1090,12 @@ class TestEventWorkflow:
         status = await handle.query(EventWorkflow.get_event_status)
 
         # Verify status has expected keys
-        assert isinstance(status, dict)
-        assert "event_id" in status
-        assert "player_count" in status
-        assert status["event_id"] == "test-event-123"
+        assert hasattr(status, "event_id")
+
+        assert status.event_id == "test-event-123"
 
     @pytest.mark.asyncio
-    async def test_event_workflow_tracks_player_count(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_event_workflow_tracks_player_count(self, client: Client, worker: Worker) -> None:
         """Test that workflow tracks player_count correctly."""
         handle = await client.start_workflow(
             EventWorkflow.run,
@@ -1180,7 +1111,7 @@ class TestEventWorkflow:
         status = await handle.query(EventWorkflow.get_event_status)
 
         # Initial player_count should be 0
-        assert status["player_count"] == 0
+        assert status.player_count == 0
 
     @pytest.mark.asyncio
     async def test_register_player_creates_new_player_entity_workflow(
@@ -1213,9 +1144,7 @@ class TestEventWorkflow:
 
         # Verify PlayerEntityWorkflow was created by querying it
         player_handle = client.get_workflow_handle(player_id)
-        player_state = await player_handle.query(
-            PlayerEntityWorkflow.get_current_state
-        )
+        player_state = await player_handle.query(PlayerEntityWorkflow.get_current_state)
 
         # Verify player state was initialized correctly
         assert player_state.player.id == player_id
@@ -1224,9 +1153,7 @@ class TestEventWorkflow:
         assert player_state.player.last_name == "Doe"
 
     @pytest.mark.asyncio
-    async def test_register_player_returns_player_id(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_register_player_returns_player_id(self, client: Client, worker: Worker) -> None:
         """Test that register_player() returns player_id."""
         handle = await client.start_workflow(
             EventWorkflow.run,
@@ -1270,7 +1197,7 @@ class TestEventWorkflow:
 
         # Initial player_count should be 0
         status = await handle.query(EventWorkflow.get_event_status)
-        assert status["player_count"] == 0
+        assert status.player_count == 0
 
         # Register first player
         await handle.execute_update(
@@ -1284,7 +1211,7 @@ class TestEventWorkflow:
 
         # Verify player_count incremented to 1
         status = await handle.query(EventWorkflow.get_event_status)
-        assert status["player_count"] == 1
+        assert status.player_count == 1
 
         # Register second player
         await handle.execute_update(
@@ -1298,7 +1225,7 @@ class TestEventWorkflow:
 
         # Verify player_count incremented to 2
         status = await handle.query(EventWorkflow.get_event_status)
-        assert status["player_count"] == 2
+        assert status.player_count == 2
 
     @pytest.mark.asyncio
     async def test_register_player_stores_email_to_player_id_mapping(
@@ -1356,7 +1283,7 @@ class TestEventWorkflow:
 
         # Initial player_count should be 0
         status = await handle.query(EventWorkflow.get_event_status)
-        assert status["player_count"] == 0
+        assert status.player_count == 0
 
         # Register first player
         first_player_id = await handle.execute_update(
@@ -1370,7 +1297,7 @@ class TestEventWorkflow:
 
         # Verify initial player_count is 1
         status = await handle.query(EventWorkflow.get_event_status)
-        assert status["player_count"] == 1
+        assert status.player_count == 1
 
         # Register again with same email (duplicate)
         second_player_id = await handle.execute_update(
@@ -1387,7 +1314,7 @@ class TestEventWorkflow:
 
         # Player count should still be 1 (no new player created)
         status = await handle.query(EventWorkflow.get_event_status)
-        assert status["player_count"] == 1
+        assert status.player_count == 1
 
     @pytest.mark.asyncio
     async def test_register_player_validates_email_via_validate_email_activity(
@@ -1452,11 +1379,11 @@ class TestEventWorkflow:
         # The mock config has 3 days (2025-03-10, 2025-03-11, 2025-03-12)
         # So we expect 3 daily workflow IDs to be tracked
         # NOTE: This test will fail initially because scheduling is not yet implemented
-        assert "daily_workflow_ids" in status
-        assert len(status["daily_workflow_ids"]) == 3
-        assert "2025-03-10" in status["daily_workflow_ids"]
-        assert "2025-03-11" in status["daily_workflow_ids"]
-        assert "2025-03-12" in status["daily_workflow_ids"]
+        assert hasattr(status, "daily_workflow_ids")
+        assert len(status.daily_workflow_ids) == 3
+        assert "2025-03-10" in status.daily_workflow_ids
+        assert "2025-03-11" in status.daily_workflow_ids
+        assert "2025-03-12" in status.daily_workflow_ids
 
     @pytest.mark.asyncio
     async def test_daily_workflow_starts_at_day_start_time(
@@ -1479,7 +1406,7 @@ class TestEventWorkflow:
 
         # Get the daily workflow ID for first day
         status = await handle.query(EventWorkflow.get_event_status)
-        daily_workflow_id = status["daily_workflow_ids"]["2025-03-10"]
+        daily_workflow_id = status.daily_workflow_ids["2025-03-10"]
 
         # Get handle to the daily workflow
         daily_handle = client.get_workflow_handle(daily_workflow_id)
@@ -1513,9 +1440,9 @@ class TestEventWorkflow:
         status = await handle.query(EventWorkflow.get_event_status)
 
         # Verify workflow IDs follow the pattern "{event_id}-{date}"
-        assert status["daily_workflow_ids"]["2025-03-10"] == "test-event-123-2025-03-10"
-        assert status["daily_workflow_ids"]["2025-03-11"] == "test-event-123-2025-03-11"
-        assert status["daily_workflow_ids"]["2025-03-12"] == "test-event-123-2025-03-12"
+        assert status.daily_workflow_ids["2025-03-10"] == "test-event-123-2025-03-10"
+        assert status.daily_workflow_ids["2025-03-11"] == "test-event-123-2025-03-11"
+        assert status.daily_workflow_ids["2025-03-12"] == "test-event-123-2025-03-12"
 
     @pytest.mark.asyncio
     async def test_workflow_passes_correct_questions_to_each_daily_workflow(
@@ -1538,7 +1465,7 @@ class TestEventWorkflow:
 
         # Get the daily workflow ID for first day
         status = await handle.query(EventWorkflow.get_event_status)
-        daily_workflow_id = status["daily_workflow_ids"]["2025-03-10"]
+        daily_workflow_id = status.daily_workflow_ids["2025-03-10"]
 
         # Get handle to the daily workflow
         daily_handle = client.get_workflow_handle(daily_workflow_id)

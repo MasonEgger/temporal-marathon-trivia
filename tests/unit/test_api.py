@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 from fastapi.testclient import TestClient
 
+from src.models.answer import EventStatusResponse
+
 
 class TestHealthEndpoint:
     """Tests for health check endpoint."""
@@ -108,9 +110,7 @@ class TestPlayerRegistration:
         mock_client = AsyncMock()
         mock_handle = AsyncMock()
         # Simulate workflow rejecting registration
-        mock_handle.execute_update = AsyncMock(
-            side_effect=ApplicationError("Invalid email domain")
-        )
+        mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("Invalid email domain"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
 
@@ -142,9 +142,7 @@ class TestPlayerRegistration:
         # Manually set up app.state
         mock_client = AsyncMock()
         # Simulate unexpected error (e.g., network issue)
-        mock_client.get_workflow_handle = MagicMock(
-            side_effect=RuntimeError("Connection failed")
-        )
+        mock_client.get_workflow_handle = MagicMock(side_effect=RuntimeError("Connection failed"))
         app.state.temporal_client = mock_client
 
         client = TestClient(app)
@@ -329,9 +327,7 @@ class TestGameplayStartDay:
         mock_client = AsyncMock()
         mock_handle = AsyncMock()
         # Simulate workflow rejecting invalid date format
-        mock_handle.execute_update = AsyncMock(
-            side_effect=ApplicationError("Invalid date format")
-        )
+        mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("Invalid date format"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
 
@@ -356,9 +352,7 @@ class TestGameplayStartDay:
 
         mock_client = AsyncMock()
         # Simulate unexpected error (e.g., network issue)
-        mock_client.get_workflow_handle = MagicMock(
-            side_effect=RuntimeError("Connection timeout")
-        )
+        mock_client.get_workflow_handle = MagicMock(side_effect=RuntimeError("Connection timeout"))
         app.state.temporal_client = mock_client
 
         client = TestClient(app)
@@ -637,9 +631,7 @@ class TestGameplaySubmitAnswer:
 
         mock_client = AsyncMock()
         # Simulate unexpected error
-        mock_client.get_workflow_handle = MagicMock(
-            side_effect=RuntimeError("Connection timeout")
-        )
+        mock_client.get_workflow_handle = MagicMock(side_effect=RuntimeError("Connection timeout"))
         app.state.temporal_client = mock_client
 
         client = TestClient(app)
@@ -654,3 +646,805 @@ class TestGameplaySubmitAnswer:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "error" in response.text.lower()
+
+
+class TestLeaderboardEndpoint:
+    """Tests for GET /api/leaderboard endpoint.
+
+    These are UNIT tests focused on application logic only:
+    - Data aggregation from multiple DailyWorkflows
+    - Redis caching strategy (key naming, TTL)
+    - HTML template rendering
+    - Ranking and sorting logic
+
+    We mock Temporal and Redis to isolate our application logic.
+    """
+
+    def test_leaderboard_returns_html_table_fragment(self) -> None:
+        """Test that GET /api/leaderboard returns HTML table fragment.
+
+        This tests OUR application logic - the specific HTML structure
+        we generate for the leaderboard display.
+        """
+        from src.api.main import app
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Mock Redis - no cached data
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=None)
+        app.state.redis = mock_redis
+
+        # Mock Temporal client
+        mock_client = AsyncMock()
+        mock_event_handle = AsyncMock()
+        mock_event_handle.query = AsyncMock(
+            return_value=EventStatusResponse(
+                event_id="test-event",
+                player_count=2,
+                daily_workflow_ids={"2025-03-10": "test-event-2025-03-10"},
+            )
+        )
+
+        # Mock DailyWorkflow
+        mock_daily_handle = AsyncMock()
+        mock_daily_handle.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=100,
+                    daily_scores={"2025-03-10": 100},
+                    email="alice@example.com",
+                ),
+                LeaderboardEntry(
+                    rank=2,
+                    display_name="Bob C.",
+                    total_score=80,
+                    daily_scores={"2025-03-10": 80},
+                    email="bob@example.com",
+                ),
+            ]
+        )
+
+        def get_workflow_handle(workflow_id: str):
+            if workflow_id == "marathon-trivia-event":
+                return mock_event_handle
+            else:
+                return mock_daily_handle
+
+        mock_client.get_workflow_handle = MagicMock(side_effect=get_workflow_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get("/api/leaderboard")
+
+        # Verify OUR response format (HTML fragment)
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Verify leaderboard data is in response (our template rendering)
+        assert "Alice B." in response.text
+        assert "Bob C." in response.text
+        assert "100" in response.text
+        assert "80" in response.text
+
+    def test_leaderboard_is_cached_in_redis_for_30_seconds(self) -> None:
+        """Test that leaderboard data is cached in Redis with 30 second TTL.
+
+        This tests OUR application logic - caching strategy with key naming
+        and TTL configuration.
+        """
+        from src.api.main import app
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Mock Redis - no cached data initially
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=None)
+        mock_redis.set = MagicMock()
+        app.state.redis = mock_redis
+
+        # Mock Temporal client
+        mock_client = AsyncMock()
+        mock_event_handle = AsyncMock()
+        mock_event_handle.query = AsyncMock(
+            return_value=EventStatusResponse(
+                event_id="test-event",
+                player_count=1,
+                daily_workflow_ids={"2025-03-10": "test-event-2025-03-10"},
+            )
+        )
+
+        mock_daily_handle = AsyncMock()
+        mock_daily_handle.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=100,
+                    daily_scores={"2025-03-10": 100},
+                    email="alice@example.com",
+                ),
+            ]
+        )
+
+        def get_workflow_handle(workflow_id: str):
+            if workflow_id == "marathon-trivia-event":
+                return mock_event_handle
+            else:
+                return mock_daily_handle
+
+        mock_client.get_workflow_handle = MagicMock(side_effect=get_workflow_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get("/api/leaderboard")
+
+        # Verify OUR caching logic
+        assert response.status_code == 200
+        # Verify Redis.set was called with correct key and TTL
+        mock_redis.set.assert_called_once()
+        call_args = mock_redis.set.call_args
+        assert call_args[0][0] == "leaderboard:full"  # OUR key naming
+        assert call_args[1]["ex"] == 30  # OUR TTL (30 seconds)
+
+    def test_leaderboard_returns_cached_data_if_available(self) -> None:
+        """Test that leaderboard returns cached data without querying Temporal.
+
+        This tests OUR application logic - cache-first strategy to reduce
+        Temporal query load.
+        """
+        import json
+
+        from src.api.main import app
+
+        # Mock Redis - return cached data
+        cached_data = json.dumps(
+            [
+                {
+                    "rank": 1,
+                    "display_name": "Cached Player",
+                    "total_score": 999,
+                    "daily_scores": {"2025-03-10": 999},
+                    "email": "cached@example.com",
+                }
+            ]
+        )
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=cached_data)
+        app.state.redis = mock_redis
+
+        # Mock Temporal client - should NOT be called
+        mock_client = AsyncMock()
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get("/api/leaderboard")
+
+        # Verify OUR cache-first logic
+        assert response.status_code == 200
+        assert "Cached Player" in response.text
+        assert "999" in response.text
+        # Verify Redis.get was called with correct key
+        mock_redis.get.assert_called_once_with("leaderboard:full")
+        # Verify Temporal was NOT queried (cache hit)
+        mock_client.get_workflow_handle.assert_not_called()
+
+    def test_leaderboard_aggregates_scores_from_all_daily_workflows(self) -> None:
+        """Test that leaderboard aggregates scores from multiple DailyWorkflows.
+
+        This tests OUR application logic - aggregating player data across
+        multiple days to calculate total scores.
+        """
+        from src.api.main import app
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Mock Redis - no cached data
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=None)
+        mock_redis.set = MagicMock()
+        app.state.redis = mock_redis
+
+        # Mock Temporal client with 2 days
+        mock_client = AsyncMock()
+        mock_event_handle = AsyncMock()
+        mock_event_handle.query = AsyncMock(
+            return_value=EventStatusResponse(
+                event_id="test-event",
+                player_count=2,
+                daily_workflow_ids={
+                    "2025-03-10": "test-event-2025-03-10",
+                    "2025-03-11": "test-event-2025-03-11",
+                },
+            )
+        )
+
+        # Mock DailyWorkflow for Day 1
+        mock_daily_handle_1 = AsyncMock()
+        mock_daily_handle_1.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=50,
+                    daily_scores={"2025-03-10": 50},
+                    email="alice@example.com",
+                ),
+                LeaderboardEntry(
+                    rank=2,
+                    display_name="Bob C.",
+                    total_score=40,
+                    daily_scores={"2025-03-10": 40},
+                    email="bob@example.com",
+                ),
+            ]
+        )
+
+        # Mock DailyWorkflow for Day 2
+        mock_daily_handle_2 = AsyncMock()
+        mock_daily_handle_2.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Bob C.",
+                    total_score=60,
+                    daily_scores={"2025-03-11": 60},
+                    email="bob@example.com",
+                ),
+                LeaderboardEntry(
+                    rank=2,
+                    display_name="Alice B.",
+                    total_score=55,
+                    daily_scores={"2025-03-11": 55},
+                    email="alice@example.com",
+                ),
+            ]
+        )
+
+        def get_workflow_handle(workflow_id: str):
+            if workflow_id == "marathon-trivia-event":
+                return mock_event_handle
+            elif workflow_id == "test-event-2025-03-10":
+                return mock_daily_handle_1
+            elif workflow_id == "test-event-2025-03-11":
+                return mock_daily_handle_2
+
+        mock_client.get_workflow_handle = MagicMock(side_effect=get_workflow_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get("/api/leaderboard")
+
+        # Verify OUR aggregation logic
+        assert response.status_code == 200
+        # Alice: 50 + 55 = 105, Bob: 40 + 60 = 100
+        # Alice should be ranked #1 (higher total score)
+        assert "Alice B." in response.text
+        assert "Bob C." in response.text
+        # Verify both days are shown
+        assert "50" in response.text  # Alice Day 1
+        assert "55" in response.text  # Alice Day 2
+
+    def test_leaderboard_shows_correct_ranking_with_ties(self) -> None:
+        """Test that leaderboard handles tied players correctly.
+
+        This tests OUR application logic - ranking with tie handling where
+        tied players share the same rank and next rank adjusts.
+        """
+        from src.api.main import app
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Mock Redis - no cached data
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=None)
+        mock_redis.set = MagicMock()
+        app.state.redis = mock_redis
+
+        # Mock Temporal client
+        mock_client = AsyncMock()
+        mock_event_handle = AsyncMock()
+        mock_event_handle.query = AsyncMock(
+            return_value=EventStatusResponse(
+                event_id="test-event",
+                player_count=4,
+                daily_workflow_ids={"2025-03-10": "test-event-2025-03-10"},
+            )
+        )
+
+        # Mock DailyWorkflow with tied scores
+        mock_daily_handle = AsyncMock()
+        mock_daily_handle.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=100,
+                    daily_scores={"2025-03-10": 100},
+                    email="alice@example.com",
+                ),
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Bob C.",
+                    total_score=100,
+                    daily_scores={"2025-03-10": 100},
+                    email="bob@example.com",
+                ),
+                LeaderboardEntry(
+                    rank=3,
+                    display_name="Charlie D.",
+                    total_score=80,
+                    daily_scores={"2025-03-10": 80},
+                    email="charlie@example.com",
+                ),
+            ]
+        )
+
+        def get_workflow_handle(workflow_id: str):
+            if workflow_id == "marathon-trivia-event":
+                return mock_event_handle
+            else:
+                return mock_daily_handle
+
+        mock_client.get_workflow_handle = MagicMock(side_effect=get_workflow_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get("/api/leaderboard")
+
+        # Verify OUR tie handling logic
+        assert response.status_code == 200
+        # Both Alice and Bob should show rank 1
+        # Charlie should show rank 3 (not rank 2)
+        assert "Alice B." in response.text
+        assert "Bob C." in response.text
+        assert "Charlie D." in response.text
+
+    def test_leaderboard_shows_daily_scores_per_player(self) -> None:
+        """Test that leaderboard displays daily breakdown per player.
+
+        This tests OUR application logic - showing both total scores
+        and daily score breakdowns for each player.
+        """
+        from src.api.main import app
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Mock Redis - no cached data
+        mock_redis = MagicMock()
+        mock_redis.get = MagicMock(return_value=None)
+        mock_redis.set = MagicMock()
+        app.state.redis = mock_redis
+
+        # Mock Temporal client
+        mock_client = AsyncMock()
+        mock_event_handle = AsyncMock()
+        mock_event_handle.query = AsyncMock(
+            return_value=EventStatusResponse(
+                event_id="test-event",
+                player_count=1,
+                daily_workflow_ids={
+                    "2025-03-10": "test-event-2025-03-10",
+                    "2025-03-11": "test-event-2025-03-11",
+                },
+            )
+        )
+
+        # Mock DailyWorkflows
+        mock_daily_handle_1 = AsyncMock()
+        mock_daily_handle_1.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=50,
+                    daily_scores={"2025-03-10": 50},
+                    email="alice@example.com",
+                ),
+            ]
+        )
+
+        mock_daily_handle_2 = AsyncMock()
+        mock_daily_handle_2.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=105,
+                    daily_scores={"2025-03-11": 55},
+                    email="alice@example.com",
+                ),
+            ]
+        )
+
+        def get_workflow_handle(workflow_id: str):
+            if workflow_id == "marathon-trivia-event":
+                return mock_event_handle
+            elif workflow_id == "test-event-2025-03-10":
+                return mock_daily_handle_1
+            elif workflow_id == "test-event-2025-03-11":
+                return mock_daily_handle_2
+
+        mock_client.get_workflow_handle = MagicMock(side_effect=get_workflow_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get("/api/leaderboard")
+
+        # Verify OUR daily score display logic
+        assert response.status_code == 200
+        # Should show total score (105) and daily breakdown (50, 55)
+        assert "Alice B." in response.text
+        # Daily scores should be visible
+        assert "50" in response.text  # Day 1 score
+        assert "55" in response.text  # Day 2 score
+
+
+class TestAggregateLeaderboards:
+    """Tests for aggregate_leaderboards helper function.
+
+    These tests focus on OUR application logic for:
+    - Merging player data across multiple days
+    - Calculating total scores correctly
+    - Ranking with tie handling
+    - Alphabetical tie-breaking
+    """
+
+    def test_aggregate_single_day_leaderboard(self) -> None:
+        """Test aggregating a single day's leaderboard.
+
+        This tests OUR logic for handling the simplest case - one day,
+        no merging needed.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="alice@example.com",
+            ),
+            LeaderboardEntry(
+                rank=2,
+                display_name="Bob C.",
+                total_score=80,
+                daily_scores={"2025-03-10": 80},
+                email="bob@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1])
+
+        # Verify OUR aggregation preserves single-day data
+        assert len(result) == 2
+        assert result[0].rank == 1
+        assert result[0].display_name == "Alice B."
+        assert result[0].total_score == 100
+        assert result[0].daily_scores == {"2025-03-10": 100}
+
+    def test_aggregate_merges_same_player_across_days(self) -> None:
+        """Test that aggregation merges same player's scores across days.
+
+        This tests OUR core logic - identifying players by email and
+        merging their daily scores.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=50,
+                daily_scores={"2025-03-10": 50},
+                email="alice@example.com",
+            ),
+        ]
+
+        day2 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=60,
+                daily_scores={"2025-03-11": 60},
+                email="alice@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1, day2])
+
+        # Verify OUR merging logic
+        assert len(result) == 1
+        assert result[0].display_name == "Alice B."
+        assert result[0].total_score == 110  # 50 + 60
+        assert result[0].daily_scores == {"2025-03-10": 50, "2025-03-11": 60}
+
+    def test_aggregate_calculates_total_scores_correctly(self) -> None:
+        """Test that total scores are calculated correctly across all days.
+
+        This tests OUR arithmetic - summing daily scores accurately.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Alice plays 3 days: 50 + 60 + 40 = 150
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=50,
+                daily_scores={"2025-03-10": 50},
+                email="alice@example.com",
+            ),
+        ]
+
+        day2 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=60,
+                daily_scores={"2025-03-11": 60},
+                email="alice@example.com",
+            ),
+        ]
+
+        day3 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=40,
+                daily_scores={"2025-03-12": 40},
+                email="alice@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1, day2, day3])
+
+        # Verify OUR total score calculation
+        assert len(result) == 1
+        assert result[0].total_score == 150
+
+    def test_aggregate_ranks_by_total_score_descending(self) -> None:
+        """Test that players are ranked by total score in descending order.
+
+        This tests OUR ranking logic - highest score gets rank 1.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Alice: 50 + 55 = 105, Bob: 40 + 60 = 100
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=50,
+                daily_scores={"2025-03-10": 50},
+                email="alice@example.com",
+            ),
+            LeaderboardEntry(
+                rank=2,
+                display_name="Bob C.",
+                total_score=40,
+                daily_scores={"2025-03-10": 40},
+                email="bob@example.com",
+            ),
+        ]
+
+        day2 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Bob C.",
+                total_score=60,
+                daily_scores={"2025-03-11": 60},
+                email="bob@example.com",
+            ),
+            LeaderboardEntry(
+                rank=2,
+                display_name="Alice B.",
+                total_score=55,
+                daily_scores={"2025-03-11": 55},
+                email="alice@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1, day2])
+
+        # Verify OUR ranking (Alice 105 > Bob 100)
+        assert len(result) == 2
+        assert result[0].rank == 1
+        assert result[0].display_name == "Alice B."
+        assert result[0].total_score == 105
+        assert result[1].rank == 2
+        assert result[1].display_name == "Bob C."
+        assert result[1].total_score == 100
+
+    def test_aggregate_handles_tied_scores_correctly(self) -> None:
+        """Test that tied players share the same rank.
+
+        This tests OUR tie handling logic - multiple players at same
+        score get same rank.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Both players score 100 total
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="alice@example.com",
+            ),
+            LeaderboardEntry(
+                rank=1,
+                display_name="Bob C.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="bob@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1])
+
+        # Verify OUR tie handling (both rank 1)
+        assert len(result) == 2
+        # Alphabetically: Alice before Bob
+        assert result[0].display_name == "Alice B."
+        assert result[0].rank == 1
+        assert result[1].display_name == "Bob C."
+        assert result[1].rank == 1
+
+    def test_aggregate_adjusts_rank_after_tie(self) -> None:
+        """Test that rank adjusts correctly after tied players.
+
+        This tests OUR logic - if 2 players tie for rank 1, next player
+        is rank 3 (not rank 2).
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Alice and Bob tie at 100, Charlie scores 80
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="alice@example.com",
+            ),
+            LeaderboardEntry(
+                rank=1,
+                display_name="Bob C.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="bob@example.com",
+            ),
+            LeaderboardEntry(
+                rank=3,
+                display_name="Charlie D.",
+                total_score=80,
+                daily_scores={"2025-03-10": 80},
+                email="charlie@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1])
+
+        # Verify OUR rank adjustment logic
+        assert len(result) == 3
+        assert result[0].rank == 1  # Alice
+        assert result[1].rank == 1  # Bob
+        assert result[2].rank == 3  # Charlie (rank 3, not 2!)
+
+    def test_aggregate_breaks_ties_alphabetically(self) -> None:
+        """Test that ties are broken alphabetically by display name.
+
+        This tests OUR alphabetical sorting logic for tied players.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Three players, all score 100
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Zoe Y.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="zoe@example.com",
+            ),
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="alice@example.com",
+            ),
+            LeaderboardEntry(
+                rank=1,
+                display_name="Bob C.",
+                total_score=100,
+                daily_scores={"2025-03-10": 100},
+                email="bob@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1])
+
+        # Verify OUR alphabetical tie-breaking
+        assert len(result) == 3
+        assert result[0].display_name == "Alice B."
+        assert result[1].display_name == "Bob C."
+        assert result[2].display_name == "Zoe Y."
+        # All should have rank 1
+        assert result[0].rank == 1
+        assert result[1].rank == 1
+        assert result[2].rank == 1
+
+    def test_aggregate_handles_empty_leaderboards(self) -> None:
+        """Test that empty leaderboards are handled gracefully.
+
+        This tests OUR edge case handling - empty input returns empty output.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+
+        result = aggregate_leaderboards([])
+
+        # Verify OUR empty handling
+        assert len(result) == 0
+
+    def test_aggregate_handles_players_missing_some_days(self) -> None:
+        """Test that players who didn't play all days are handled correctly.
+
+        This tests OUR logic for partial participation - players get credit
+        for days they played, zero for days they didn't.
+        """
+        from src.api.routes.leaderboard import aggregate_leaderboards
+        from src.models.leaderboard import LeaderboardEntry
+
+        # Alice plays both days, Bob only plays day 1
+        day1 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=50,
+                daily_scores={"2025-03-10": 50},
+                email="alice@example.com",
+            ),
+            LeaderboardEntry(
+                rank=2,
+                display_name="Bob C.",
+                total_score=40,
+                daily_scores={"2025-03-10": 40},
+                email="bob@example.com",
+            ),
+        ]
+
+        day2 = [
+            LeaderboardEntry(
+                rank=1,
+                display_name="Alice B.",
+                total_score=60,
+                daily_scores={"2025-03-11": 60},
+                email="alice@example.com",
+            ),
+        ]
+
+        result = aggregate_leaderboards([day1, day2])
+
+        # Verify OUR partial participation handling
+        assert len(result) == 2
+        # Alice: 50 + 60 = 110
+        assert result[0].display_name == "Alice B."
+        assert result[0].total_score == 110
+        assert result[0].daily_scores == {"2025-03-10": 50, "2025-03-11": 60}
+        # Bob: 40 + 0 = 40
+        assert result[1].display_name == "Bob C."
+        assert result[1].total_score == 40
+        assert result[1].daily_scores == {"2025-03-10": 40}

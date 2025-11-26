@@ -173,3 +173,33 @@ class CreateTimezoneAwareDatetimeRequest:
     time_hour: int
     time_minute: int
     timezone: str
+
+
+@dataclass
+class EventStatusResponse:
+    """Response model for get_event_status query in EventWorkflow.
+
+    Contains metadata about the event's current state, including registered
+    players and scheduled daily workflows.
+
+    Attributes:
+        event_id: Unique identifier for the event
+        player_count: Total number of registered players
+        daily_workflow_ids: Mapping of date strings to DailyWorkflow IDs
+
+    Example:
+        >>> response = EventStatusResponse(
+        ...     event_id="marathon-trivia-2025",
+        ...     player_count=150,
+        ...     daily_workflow_ids={
+        ...         "2025-03-10": "marathon-trivia-2025-2025-03-10",
+        ...         "2025-03-11": "marathon-trivia-2025-2025-03-11",
+        ...     }
+        ... )
+        >>> response.player_count
+        150
+    """
+
+    event_id: str
+    player_count: int
+    daily_workflow_ids: dict[str, str]

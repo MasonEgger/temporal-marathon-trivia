@@ -233,6 +233,10 @@ Example test names:
 TEMPORAL_ADDRESS=localhost:7233
 TEMPORAL_NAMESPACE=default
 TEMPORAL_TASK_QUEUE=marathon-trivia
+EVENT_WORKFLOW_ID=marathon-trivia-event
+
+# Event configuration
+EVENT_CONFIG_PATH=config/event.toml
 
 # Temporal Cloud (if applicable)
 TEMPORAL_TLS_CERT_PATH=/path/to/cert.pem
@@ -345,11 +349,11 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 4 in progress - 20/35 steps complete (57.1% total progress)
+**Current Status**: Phase 4 in progress - 21/35 steps complete (60.0% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
-- Phase 4 (API Layer): 66.7% complete (4/6 steps)
+- Phase 4 (API Layer): 83.3% complete (5/6 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -492,8 +496,13 @@ def test_fastapi_app_can_be_created():
   - Fields: is_correct (bool), correct_answer (str | None), next_question (Question | None), completion_message (str | None), current_score (int), total_questions (int)
   - Contains all feedback needed by client after answer submission
   - Mutually exclusive next_question and completion_message
-- 100% test coverage (6 test cases)
-- **Design Pattern**: Request/response dataclasses for complex update handlers ensure type safety
+- **EventStatusResponse**: Type-safe response model for EventWorkflow.get_event_status query
+  - Fields: event_id (str), player_count (int), daily_workflow_ids (dict[str, str])
+  - Replaces ugly `dict[str, str | int | dict[str, str]]` union type
+  - Provides clean attribute access: `status.event_id` vs `status["event_id"]`
+  - From Step 21: User-suggested refactor for better type safety
+- 100% test coverage (8 test cases)
+- **Design Pattern**: Request/response dataclasses for complex update handlers and query responses ensure type safety
 
 ## Temporal Activity Implementation Patterns (CRITICAL)
 
@@ -954,6 +963,36 @@ Before writing a workflow test:
   - Unexpected exception handling
 - **Design Pattern**: Manual cookie validation for HTMX (200 + error HTML > 422)
 
+### Leaderboard Routes (`src/api/routes/leaderboard.py`)
+- **Status**: COMPLETE - Leaderboard endpoint with aggregation (Step 21) ✅
+
+#### GET /api/leaderboard - Aggregated Leaderboard
+- **Pattern**: Queries EventWorkflow for daily_workflow_ids, then queries each DailyWorkflow
+- **Response**: HTML table fragment with leaderboard data
+- **Caching Strategy**: Cache aggregated data (JSON), not HTML
+  - Key: `leaderboard:full`
+  - TTL: 30 seconds (matches frontend polling)
+  - Caches serialized LeaderboardEntry list for flexibility
+- **Aggregation Logic**: `aggregate_leaderboards()` helper function
+  - Merges player scores across all days by email
+  - Calculates total scores (sum of daily scores)
+  - Sorts by total_score descending, then alphabetically by display_name
+  - Assigns ranks with tie handling (tied players share rank, next rank adjusts)
+- **Template**: `frontend/templates/components/leaderboard.html`
+  - Conference booth optimized: high contrast, large fonts, medals for top 3
+  - Dynamic day columns based on event dates
+  - Responsive design (hides day columns on mobile)
+  - Sticky header for scrolling
+  - Visual hierarchy with medal emojis (🥇🥈🥉)
+- **Testing**: 15 unit tests (6 endpoint + 9 aggregation helper)
+  - Cache hit/miss behavior
+  - Multi-day aggregation
+  - Tie handling and rank adjustment
+  - Alphabetical tie-breaking
+  - Partial participation (players missing some days)
+- **Coverage**: 100% (56 statements, 0 missed)
+- **Design Pattern**: Cache business data (JSON), render presentation layer fresh
+
 ### EventConfig Loading Pattern 🔑 **CRITICAL** (Step 20)
 
 **Configuration is Static Data - Load at API Startup, NOT from Workflows:**
@@ -1164,7 +1203,7 @@ def test_requires_player_id_cookie():
 - **State**: EventState with event_id, config, daily_workflow_ids, player_count, player_registry
 - **Run method**: Loads config, validates questions, schedules DailyWorkflow children, runs indefinitely
 - **Queries implemented**:
-  - `get_event_status() -> dict` - Returns event_id, player_count, and daily_workflow_ids for monitoring
+  - `get_event_status() -> EventStatusResponse` - Returns event metadata (event_id, player_count, daily_workflow_ids)
   - `get_player_id_by_email(email: str) -> str | None` - Lookup player by email
 - **Update handlers implemented**:
   - `register_player(request: RegisterPlayerRequest) -> str` - Creates PlayerEntityWorkflow child, validates email, handles duplicates

@@ -117,9 +117,7 @@ class DailyWorkflow:
         self.state: DailyState | None = None
 
     @workflow.run
-    async def run(
-        self, date: str, questions: list[Question], config: EventConfig
-    ) -> None:
+    async def run(self, date: str, questions: list[Question], config: EventConfig) -> None:
         """Run method that initializes state and keeps workflow running.
 
         Args:
