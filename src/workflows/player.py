@@ -7,10 +7,11 @@ from typing import cast
 from temporalio import workflow
 from temporalio.exceptions import ApplicationError
 
-from src.models.answer import AnswerResult, SubmitAnswerRequest
-from src.models.player import Player
-from src.models.question import Question
-from src.models.state import PlayerState
+with workflow.unsafe.imports_passed_through():
+    from src.models.answer import AnswerResult, SubmitAnswerRequest
+    from src.models.player import Player
+    from src.models.question import Question
+    from src.models.state import PlayerState
 
 
 @workflow.defn
@@ -32,7 +33,9 @@ class PlayerEntityWorkflow:
         self.state: PlayerState | None = None
 
     @workflow.run
-    async def run(self, player_id: str, email: str, first_name: str, last_name: str) -> None:
+    async def run(
+        self, player_id: str, email: str, first_name: str, last_name: str
+    ) -> None:
         """Run method initializes player state and waits indefinitely.
 
         Args:
@@ -58,7 +61,9 @@ class PlayerEntityWorkflow:
         )
 
         # Initialize workflow state
-        self.state = PlayerState(player=player, current_day=None, current_question_index=0)
+        self.state = PlayerState(
+            player=player, current_day=None, current_question_index=0
+        )
 
         # Keep workflow running indefinitely
         await workflow.wait_condition(lambda: False)
@@ -91,7 +96,9 @@ class PlayerEntityWorkflow:
             current_day=self.state.current_day,
             current_question_index=self.state.current_question_index,
             current_questions=(
-                list(self.state.current_questions) if self.state.current_questions else None
+                list(self.state.current_questions)
+                if self.state.current_questions
+                else None
             ),
         )
 
@@ -132,7 +139,9 @@ class PlayerEntityWorkflow:
         return date in self.state.player.completed_days
 
     @workflow.update
-    async def start_day(self, date: str, file_path: str = "config/questions.json") -> Question:
+    async def start_day(
+        self, date: str, file_path: str = "config/questions.json"
+    ) -> Question:
         """Update handler to start a new day of questions.
 
         Loads questions for the specified date via activity and returns the first question.
@@ -166,9 +175,8 @@ class PlayerEntityWorkflow:
         from src.activities.questions import QuestionsActivities
 
         # Call activity to get questions for the day
-        questions_activities = QuestionsActivities()
         questions = await workflow.execute_activity_method(
-            questions_activities.get_questions_for_day,
+            QuestionsActivities.get_questions_for_day,
             args=[file_path, date],
             start_to_close_timeout=timedelta(seconds=10),
         )
@@ -255,7 +263,9 @@ class PlayerEntityWorkflow:
 
         # Get current score and total questions
         current_score = self.state.player.daily_scores.get(request.date, 0)
-        total_questions = len(self.state.current_questions) if self.state.current_questions else 0
+        total_questions = (
+            len(self.state.current_questions) if self.state.current_questions else 0
+        )
 
         # Increment question index
         self.state.current_question_index += 1
@@ -270,7 +280,9 @@ class PlayerEntityWorkflow:
             return AnswerResult(
                 is_correct=is_correct,
                 correct_answer=(
-                    current_question.correct_answer if request.show_correct_answer else None
+                    current_question.correct_answer
+                    if request.show_correct_answer
+                    else None
                 ),
                 next_question=next_question,
                 completion_message=None,
@@ -280,11 +292,15 @@ class PlayerEntityWorkflow:
         else:
             # All questions answered - mark day as completed
             self.state.player.completed_days.add(request.date)
-            completion_message = f"Day complete! You scored {current_score}/{total_questions}."
+            completion_message = (
+                f"Day complete! You scored {current_score}/{total_questions}."
+            )
             return AnswerResult(
                 is_correct=is_correct,
                 correct_answer=(
-                    current_question.correct_answer if request.show_correct_answer else None
+                    current_question.correct_answer
+                    if request.show_correct_answer
+                    else None
                 ),
                 next_question=None,
                 completion_message=completion_message,

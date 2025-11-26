@@ -142,3 +142,34 @@ class RegisterPlayerRequest:
     email: str
     first_name: str
     last_name: str
+
+
+@dataclass
+class CreateTimezoneAwareDatetimeRequest:
+    """Request model for create_timezone_aware_datetime activity.
+
+    Encapsulates all parameters needed to create a timezone-aware datetime,
+    maintaining type safety when calling time conversion activities.
+
+    Attributes:
+        date_str: Date string in ISO format (e.g., "2025-03-10")
+        time_hour: Hour component (0-23)
+        time_minute: Minute component (0-59)
+        timezone: IANA timezone string (e.g., "America/Los_Angeles")
+
+    Example:
+        >>> request = CreateTimezoneAwareDatetimeRequest(
+        ...     date_str="2025-03-10",
+        ...     time_hour=9,
+        ...     time_minute=0,
+        ...     timezone="America/Los_Angeles"
+        ... )
+        >>> dt = await workflow.execute_activity_method(
+        ...     time_activities.create_timezone_aware_datetime, request
+        ... )
+    """
+
+    date_str: str
+    time_hour: int
+    time_minute: int
+    timezone: str

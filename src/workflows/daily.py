@@ -3,11 +3,12 @@
 
 from temporalio import workflow
 
-from src.models.answer import SubmitScoreRequest
-from src.models.config import EventConfig
-from src.models.leaderboard import LeaderboardEntry
-from src.models.question import Question
-from src.models.state import DailyState
+with workflow.unsafe.imports_passed_through():
+    from src.models.answer import SubmitScoreRequest
+    from src.models.config import EventConfig
+    from src.models.leaderboard import LeaderboardEntry
+    from src.models.question import Question
+    from src.models.state import DailyState
 
 
 def calculate_leaderboard(
@@ -116,7 +117,9 @@ class DailyWorkflow:
         self.state: DailyState | None = None
 
     @workflow.run
-    async def run(self, date: str, questions: list[Question], config: EventConfig) -> None:
+    async def run(
+        self, date: str, questions: list[Question], config: EventConfig
+    ) -> None:
         """Run method that initializes state and keeps workflow running.
 
         Args:

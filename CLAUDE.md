@@ -43,8 +43,8 @@ PlayerEntityWorkflow (entity, per player)
 ### Directory Structure
 
 - `src/workflows/`: EventWorkflow, DailyWorkflow, PlayerEntityWorkflow
-- `src/activities/`: Config loading, question loading, email validation, S3 export
-- `src/models/`: Question, Player, EventConfig, LeaderboardEntry dataclasses
+- `src/activities/`: Config loading, question loading, email validation, S3 export, timezone conversion
+- `src/models/`: Question, Player, EventConfig, LeaderboardEntry dataclasses, request/response models
 - `src/api/`: FastAPI app with routes/, cache.py, templates.py
 - `frontend/`: HTML templates and static assets (HTMX, Tailwind)
 - `config/`: event.toml and questions.json (event-specific configuration)
@@ -190,7 +190,7 @@ class TestPlayerEntityWorkflow:
 - `temporal_env` - Time-skipping WorkflowEnvironment
 - `client` - Client with pydantic_data_converter configured
 - `worker` - Worker with ThreadPoolExecutor and ALL workflows/activities registered
-- Mock activities: `MockQuestionsActivities`, `MockConfigActivities`, `MockEmailActivities`
+- Mock activities: `MockQuestionsActivities`, `MockConfigActivities`, `MockEmailActivities`, `MockTimeActivities`
 
 **CRITICAL: Mock activities MUST be synchronous (`def`) to match real activities:**
 ```python
@@ -345,10 +345,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 in progress - 15/35 steps complete (42.9% total progress)
+**Current Status**: Phase 3 complete - 16/35 steps complete (45.7% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 87.5% complete (7/8 steps)
+- Phase 3 (Workflow Implementation): 100% complete ✅
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -610,7 +610,7 @@ async def worker(...) -> AsyncGenerator[Worker]:
 
 **Key Points:**
 - Mock activities MUST be **synchronous (`def`)** to match real activities
-- `worker` fixture registers ALL 3 workflows and ALL 4 mock activities (catch-all pattern)
+- `worker` fixture registers ALL 3 workflows and ALL 5 mock activities (catch-all pattern)
 - ThreadPoolExecutor automatically included (no manual setup needed)
 - pydantic_data_converter automatically configured in client fixture
 - Helper functions: `create_test_event_config()`, `create_test_questions()`
@@ -660,6 +660,19 @@ async def worker(...) -> AsyncGenerator[Worker]:
   - Returns S3 URL for logging/tracking
   - Dynamic day columns based on event_dates parameter
   - Works with moto for reliable testing without AWS credentials
+
+### TimeActivities (`src/activities/time.py`)
+- **Method**: `create_timezone_aware_datetime(request: CreateTimezoneAwareDatetimeRequest) -> datetime`
+- **Pattern**: Synchronous (ZoneInfo operations)
+- **Purpose**: Handle timezone-aware datetime creation that cannot be done in workflow sandbox
+- **Timezone handling**: Uses ZoneInfo to create aware datetimes from date/time components
+- **Error handling**: ValueError for invalid date strings or unknown timezones
+- **Testing**: Used via mock in workflow tests (not tested independently yet)
+- **Coverage**: 58.33% (12 statements, 5 missed)
+- **Key Design**:
+  - Solves Temporal sandbox restriction on ZoneInfo imports
+  - Type-safe CreateTimezoneAwareDatetimeRequest parameter
+  - Used by EventWorkflow for scheduling DailyWorkflow children
 
 ## Temporal Workflow Implementation Patterns (CRITICAL)
 
@@ -860,28 +873,33 @@ Before writing a workflow test:
   - Temporal update validator prevents duplicate score submissions
 
 ### EventWorkflow (`src/workflows/event.py`)
-- **Status**: PLAYER REGISTRATION COMPLETE (Steps 14-15) ✅
+- **Status**: COMPLETE - All core functionality implemented (Steps 14-16) ✅
 - **Pattern**: Parent workflow (manages entire event)
 - **State**: EventState with event_id, config, daily_workflow_ids, player_count, player_registry
-- **Run method**: Loads config via activity, validates questions via activity, initializes state, runs indefinitely
+- **Run method**: Loads config, validates questions, schedules DailyWorkflow children, runs indefinitely
 - **Queries implemented**:
-  - `get_event_status() -> dict` - Returns event_id and player_count for monitoring
+  - `get_event_status() -> dict` - Returns event_id, player_count, and daily_workflow_ids for monitoring
   - `get_player_id_by_email(email: str) -> str | None` - Lookup player by email
 - **Update handlers implemented**:
   - `register_player(request: RegisterPlayerRequest) -> str` - Creates PlayerEntityWorkflow child, validates email, handles duplicates
+- **Helper methods**:
+  - `_schedule_daily_workflow(event_date: date) -> None` - Schedules and starts DailyWorkflow for specific date
 - **Activities called**:
   - `load_event_config(config_path)` - Loads TOML configuration
   - `validate_questions_file(file_path, config)` - Validates questions match config
   - `validate_email(email, require_work_email)` - Validates email format and work domain
-- **Testing**: 11 comprehensive tests with pydantic_data_converter, mock activities, and ThreadPoolExecutor
-- **Coverage**: 91.30% (44 statements, 4 missed)
+  - `create_timezone_aware_datetime(request)` - Creates timezone-aware datetime for scheduling
+  - `get_questions_for_day(file_path, date)` - Loads questions for specific day
+- **Testing**: 15 comprehensive tests (11 basic + 4 scheduling) with pydantic_data_converter, mock activities, and ThreadPoolExecutor
+- **Coverage**: 88.57% (70 statements, 8 missed)
 - **Key Features**:
   - Configuration loading at workflow startup (fail fast on errors)
   - Player registration with child workflow creation
   - Email validation and duplicate detection
-  - Player registry for email → player_id mapping
-  - Activity method references for type safety (not string-based)
-  - Parent workflow pattern for event coordination
+  - Daily workflow scheduling with timezone-aware timers
+  - Parent-child workflow coordination
+  - Activity method references for type safety (unbound class methods)
+  - Concurrent scheduling with asyncio.create_task()
 
 ### Workflow State Models (`src/models/state.py`)
 - **Purpose**: Consolidated file for all workflow state dataclasses
@@ -911,7 +929,7 @@ This project reuses patterns from:
 
 ### Update Handler Patterns (Steps 10+) 🔑
 
-1. **Calling Activities from Workflows** ⚠️
+1. **Calling Activities from Workflows** ⚠️ **UPDATED**
    ```python
    # WRONG - String-based (not type-safe, breaks on refactoring)
    result = await workflow.execute_activity(
@@ -920,19 +938,19 @@ This project reuses patterns from:
        start_to_close_timeout=timedelta(seconds=10),
    )
 
-   # CORRECT - Method reference (type-safe, refactorable, IDE support)
+   # CORRECT - Unbound class method reference (type-safe, mypy-friendly)
    from src.activities.questions import QuestionsActivities
 
-   questions_activities = QuestionsActivities()
    result = await workflow.execute_activity_method(
-       questions_activities.get_questions_for_day,
+       QuestionsActivities.get_questions_for_day,  # Unbound class method
        args=[file_path, date],
        start_to_close_timeout=timedelta(seconds=10),
    )
    ```
    - **NEVER** call activities using string names
-   - **ALWAYS** import activity class, create instance, pass method reference
-   - Benefits: type safety, IDE autocomplete, refactoring support, compile-time errors
+   - **ALWAYS** use unbound class method references (e.g., `ConfigActivities.load_event_config`)
+   - **NEVER** create instances and use bound methods (mypy type inference issues)
+   - Benefits: type safety, IDE autocomplete, refactoring support, compile-time errors, mypy compatibility
    - Use `workflow.execute_activity_method()` not `workflow.execute_activity()`
 
 2. **Update Handlers vs Queries vs Signals**
@@ -1193,3 +1211,109 @@ This project reuses patterns from:
     - 0.1 seconds sufficient for test environment
     - **Required for ALL update handlers on newly started workflows**
     - From Step 15: Critical pattern discovered through debugging hanging tests
+
+13. **Unbound Method References for Activities** 🔑🔑🔑 **CRITICAL**
+    ```python
+    # WRONG - Bound instance method (mypy struggles with type inference)
+    time_activities = TimeActivities()
+    result = await workflow.execute_activity_method(
+        time_activities.create_timezone_aware_datetime,  # Bound method
+        request,
+        start_to_close_timeout=timedelta(seconds=10),
+    )  # mypy error: No overload matches
+
+    # CORRECT - Unbound class method (mypy infers correctly)
+    result = await workflow.execute_activity_method(
+        TimeActivities.create_timezone_aware_datetime,  # Unbound class method
+        request,
+        start_to_close_timeout=timedelta(seconds=10),
+    )  # mypy happy!
+    ```
+    - **ALWAYS use unbound class methods** (e.g., `ConfigActivities.load_event_config`)
+    - **NEVER use bound instance methods** (e.g., `config_activities.load_event_config`)
+    - Mypy's strict mode cannot properly infer types with bound methods and Temporal's complex generics
+    - Unbound methods work perfectly with type inference
+    - From Step 16: User discovered this pattern resolves all mypy call-overload errors
+    - **Pattern applies to ALL activity calls in workflows**
+
+14. **Temporal Sandbox Restrictions on ZoneInfo** 🔑🔑 **CRITICAL**
+    ```python
+    # WRONG - ZoneInfo restricted in workflow sandbox
+    from zoneinfo import ZoneInfo
+
+    @workflow.run
+    async def run(self) -> None:
+        tz = ZoneInfo("America/Los_Angeles")  # TypeError: _RestrictedProxy
+        dt = datetime.combine(date, time, tzinfo=tz)
+
+    # CORRECT - Use activity for timezone operations
+    @activity.defn
+    def create_timezone_aware_datetime(self, request: CreateTimezoneAwareDatetimeRequest) -> datetime:
+        tz = ZoneInfo(request.timezone)  # Works in activity!
+        return datetime.combine(date, time, tzinfo=tz)
+
+    # Call from workflow
+    result = await workflow.execute_activity_method(
+        TimeActivities.create_timezone_aware_datetime,
+        request,
+        ...
+    )
+    ```
+    - **ZoneInfo operations MUST be in activities**, not workflows
+    - Temporal sandbox restricts certain imports for determinism
+    - Error: `TypeError: tzinfo argument must be None or of a tzinfo subclass, not type '_RestrictedProxy'`
+    - Solution: Create TimeActivities for timezone conversions
+    - Use `workflow.unsafe.imports_passed_through()` for activity class imports if needed
+    - From Step 16: Discovered when implementing daily workflow scheduling
+
+15. **Parent-Child Workflow Scheduling with Timers** 🔑
+    ```python
+    # Schedule multiple child workflows concurrently
+    @workflow.run
+    async def run(self, event_id: str, config_path: str) -> None:
+        # Initialize state first
+        self.state = EventState(...)
+
+        # Schedule all daily workflows concurrently
+        scheduling_tasks = []
+        for event_date in config.get_all_dates():
+            task = asyncio.create_task(self._schedule_daily_workflow(event_date))
+            scheduling_tasks.append(task)
+
+        # Keep running
+        await workflow.wait_condition(lambda: False)
+
+    async def _schedule_daily_workflow(self, event_date: date) -> None:
+        # Get timezone-aware start time via activity
+        start_datetime = await workflow.execute_activity_method(
+            TimeActivities.create_timezone_aware_datetime,
+            CreateTimezoneAwareDatetimeRequest(...),
+            ...
+        )
+
+        # Wait until start time
+        current_time = workflow.now()
+        if start_datetime > current_time:
+            wait_duration = start_datetime - current_time
+            await asyncio.sleep(wait_duration.total_seconds())
+
+        # Load questions and start child workflow
+        questions = await workflow.execute_activity_method(...)
+        await workflow.start_child_workflow(
+            DailyWorkflow.run,
+            args=[date_str, questions, config],
+            id=f"{event_id}-{date_str}",
+            task_queue=workflow.info().task_queue,
+        )
+
+        # Track child workflow ID
+        self.state.daily_workflow_ids[date_str] = f"{event_id}-{date_str}"
+    ```
+    - Use `asyncio.create_task()` to schedule child workflows concurrently
+    - Each child waits for its own start time independently
+    - Use `workflow.now()` for deterministic time comparisons
+    - Use activities for timezone-aware datetime creation (ZoneInfo restricted)
+    - Track child workflow IDs in parent state for coordination
+    - Pattern: Bounded set of children (not infinite recurring)
+    - **Temporal Schedules vs Timers**: Use Schedules for cron-like recurring workflows, use timers for one-time parent-child coordination
+    - From Step 16: Daily workflow scheduling implementation

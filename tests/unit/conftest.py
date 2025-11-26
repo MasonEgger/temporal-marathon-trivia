@@ -3,7 +3,8 @@
 
 import concurrent.futures
 from collections.abc import AsyncGenerator
-from datetime import date, time
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from src.models.answer import CreateTimezoneAwareDatetimeRequest
 from src.models.config import EventConfig
 from src.models.question import Question
 from src.workflows.daily import DailyWorkflow
@@ -77,6 +79,25 @@ class MockEmailActivities:
         if email == "invalid@blocked.com":
             return False
         return True
+
+
+class MockTimeActivities:
+    """Mock time activities for EventWorkflow testing."""
+
+    @activity.defn(name="create_timezone_aware_datetime")
+    def create_timezone_aware_datetime(
+        self, request: CreateTimezoneAwareDatetimeRequest
+    ) -> datetime:
+        """Mock create_timezone_aware_datetime for testing.
+
+        Returns a timezone-aware datetime. For testing, we return a datetime
+        in the past so workflows start immediately without waiting.
+        """
+        # Parse date and create datetime with timezone
+        event_date = date.fromisoformat(request.date_str)
+        time_obj = time(hour=request.time_hour, minute=request.time_minute)
+        tz = ZoneInfo(request.timezone)
+        return datetime.combine(event_date, time_obj, tzinfo=tz)
 
 
 # ============================================================================
@@ -194,17 +215,28 @@ def mock_email_activities() -> MockEmailActivities:
     return MockEmailActivities()
 
 
+@pytest.fixture
+def mock_time_activities() -> MockTimeActivities:
+    """Return mock time activities instance.
+
+    Returns:
+        MockTimeActivities instance for testing.
+    """
+    return MockTimeActivities()
+
+
 @pytest_asyncio.fixture
 async def worker(
     client: Client,
     mock_config_activities: MockConfigActivities,
     mock_questions_activities: MockQuestionsActivities,
     mock_email_activities: MockEmailActivities,
+    mock_time_activities: MockTimeActivities,
 ) -> AsyncGenerator[Worker]:
     """Create worker with ALL workflows and ALL mock activities registered.
 
     This is a catch-all worker fixture that registers all 3 workflows and all
-    4 mock activity methods. Tests can use this single fixture without needing
+    5 mock activity methods. Tests can use this single fixture without needing
     to specify which workflows/activities they need.
 
     Args:
@@ -212,6 +244,7 @@ async def worker(
         mock_config_activities: Mock config activities fixture.
         mock_questions_activities: Mock questions activities fixture.
         mock_email_activities: Mock email activities fixture.
+        mock_time_activities: Mock time activities fixture.
 
     Yields:
         Worker instance with all workflows and activities registered.
@@ -226,6 +259,7 @@ async def worker(
                 mock_config_activities.validate_questions_file,
                 mock_questions_activities.get_questions_for_day,
                 mock_email_activities.validate_email,
+                mock_time_activities.create_timezone_aware_datetime,
             ],
             activity_executor=activity_executor,
         ) as worker:
