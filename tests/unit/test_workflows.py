@@ -1722,3 +1722,136 @@ region = "us-west-2"
 
         # If we can query it successfully, questions were passed correctly
         assert isinstance(daily_leaderboard, list)
+
+    @pytest.mark.asyncio
+    async def test_register_player_rejects_inappropriate_first_name(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() rejects inappropriate first names."""
+        handle = await client.start_workflow(
+            EventWorkflow.run,
+            args=["test-event-123", "tests/fixtures/config.toml"],
+            id=f"test-event-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Attempt to register player with inappropriate first name
+        from temporalio.client import WorkflowUpdateFailedError
+
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+            await handle.execute_update(
+                EventWorkflow.register_player,
+                RegisterPlayerRequest(
+                    email="user@example.com",
+                    first_name="badword",  # Inappropriate name
+                    last_name="Smith",
+                    company_name=None,
+                ),
+            )
+
+        # Verify error message mentions first name
+        assert "first name" in str(exc_info.value.cause).lower()
+        assert "inappropriate" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_register_player_rejects_inappropriate_last_name(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() rejects inappropriate last names."""
+        handle = await client.start_workflow(
+            EventWorkflow.run,
+            args=["test-event-123", "tests/fixtures/config.toml"],
+            id=f"test-event-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Attempt to register player with inappropriate last name
+        from temporalio.client import WorkflowUpdateFailedError
+
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+            await handle.execute_update(
+                EventWorkflow.register_player,
+                RegisterPlayerRequest(
+                    email="user@example.com",
+                    first_name="John",
+                    last_name="profanity",  # Inappropriate name
+                    company_name=None,
+                ),
+            )
+
+        # Verify error message mentions last name
+        assert "last name" in str(exc_info.value.cause).lower()
+        assert "inappropriate" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_register_player_accepts_clean_names(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() accepts clean names."""
+        handle = await client.start_workflow(
+            EventWorkflow.run,
+            args=["test-event-123", "tests/fixtures/config.toml"],
+            id=f"test-event-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Register player with clean names
+        player_id = await handle.execute_update(
+            EventWorkflow.register_player,
+            RegisterPlayerRequest(
+                email="alice@example.com",
+                first_name="Alice",
+                last_name="Johnson",
+                company_name=None,
+            ),
+        )
+
+        # Verify player was registered successfully
+        assert isinstance(player_id, str)
+        assert len(player_id) > 0
+
+        # Verify player count was incremented
+        status = await handle.query(EventWorkflow.get_event_status)
+        assert status.player_count == 1
+
+    @pytest.mark.asyncio
+    async def test_register_player_rejects_mixed_case_profanity(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() rejects profanity regardless of case."""
+        handle = await client.start_workflow(
+            EventWorkflow.run,
+            args=["test-event-123", "tests/fixtures/config.toml"],
+            id=f"test-event-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Attempt to register player with mixed-case profanity
+        from temporalio.client import WorkflowUpdateFailedError
+
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+            await handle.execute_update(
+                EventWorkflow.register_player,
+                RegisterPlayerRequest(
+                    email="user@example.com",
+                    first_name="BadWord",  # Mixed case inappropriate
+                    last_name="Smith",
+                    company_name=None,
+                ),
+            )
+
+        # Verify error was raised
+        assert "first name" in str(exc_info.value.cause).lower()
+        assert "inappropriate" in str(exc_info.value.cause).lower()

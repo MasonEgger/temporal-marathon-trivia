@@ -12,8 +12,10 @@ from src.activities.config import ConfigActivities
 from src.activities.email import EmailActivities
 from src.activities.export import ExportActivities
 from src.activities.leaderboard import LeaderboardActivities
+from src.activities.moderation import ModerationActivities
 from src.activities.questions import QuestionsActivities
 from src.activities.time import TimeActivities
+from src.clients.moderation import PurgoMalumClient
 from src.temporal_client import create_temporal_client
 from src.workflows.daily import DailyWorkflow
 from src.workflows.event import EventWorkflow
@@ -44,6 +46,7 @@ async def main() -> None:
         - EmailActivities: validate_email
         - ExportActivities: export_daily_csv_to_s3
         - TimeActivities: create_timezone_aware_datetime
+        - ModerationActivities: moderate_player_name
 
     Returns:
         None
@@ -79,6 +82,9 @@ async def main() -> None:
     export_activities = ExportActivities()
     time_activities = TimeActivities()
     leaderboard_activities = LeaderboardActivities()
+    # Create moderation activities with real PurgoMalumClient
+    moderation_client = PurgoMalumClient()
+    moderation_activities = ModerationActivities(moderation_client)
 
     print("-" * 80)
     print("Registering workflows and activities...")
@@ -95,6 +101,7 @@ async def main() -> None:
     print("  - ExportActivities (1 method)")
     print("  - TimeActivities (1 method)")
     print("  - LeaderboardActivities (1 method)")
+    print("  - ModerationActivities (1 method)")
     print("-" * 80)
 
     # Create worker with ALL workflows and activities
@@ -124,6 +131,8 @@ async def main() -> None:
                 time_activities.create_timezone_aware_datetime,
                 # LeaderboardActivities
                 leaderboard_activities.submit_score_to_daily_workflow,
+                # ModerationActivities
+                moderation_activities.moderate_player_name,
             ],
             activity_executor=activity_executor,
         )

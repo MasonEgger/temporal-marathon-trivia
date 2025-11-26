@@ -117,6 +117,39 @@ class MockTimeActivities:
         return datetime.combine(event_date, time_obj, tzinfo=tz)
 
 
+class MockModerationActivities:
+    """Mock moderation activities for EventWorkflow testing."""
+
+    def __init__(self, profane_words: list[str] | None = None) -> None:
+        """Initialize mock moderation with profanity word list.
+
+        Args:
+            profane_words: List of words to flag as profane. Defaults to common examples.
+        """
+        if profane_words is None:
+            profane_words = ["badword", "inappropriate", "profanity"]
+        self._profane_words = [word.lower() for word in profane_words]
+
+    @activity.defn(name="moderate_player_name")
+    def moderate_player_name(self, name: str) -> bool:
+        """Mock moderate_player_name that checks against configurable profanity list.
+
+        Performs case-insensitive substring matching to detect profanity.
+
+        Args:
+            name: Player name to check
+
+        Returns:
+            True if name contains profanity (should be rejected)
+            False if name is clean (should be allowed)
+        """
+        name_lower = name.lower()
+        for profane_word in self._profane_words:
+            if profane_word in name_lower:
+                return True
+        return False
+
+
 # ============================================================================
 # Test Helper Functions
 # ============================================================================
@@ -253,6 +286,16 @@ def mock_time_activities() -> MockTimeActivities:
     return MockTimeActivities()
 
 
+@pytest.fixture
+def mock_moderation_activities() -> MockModerationActivities:
+    """Return mock moderation activities instance.
+
+    Returns:
+        MockModerationActivities instance for testing.
+    """
+    return MockModerationActivities()
+
+
 @pytest_asyncio.fixture
 async def worker(
     client: Client,
@@ -261,11 +304,12 @@ async def worker(
     mock_email_activities: MockEmailActivities,
     mock_leaderboard_activities: MockLeaderboardActivities,
     mock_time_activities: MockTimeActivities,
+    mock_moderation_activities: MockModerationActivities,
 ) -> AsyncGenerator[Worker]:
     """Create worker with ALL workflows and ALL mock activities registered.
 
     This is a catch-all worker fixture that registers all 3 workflows and all
-    6 mock activity methods. Tests can use this single fixture without needing
+    7 mock activity methods. Tests can use this single fixture without needing
     to specify which workflows/activities they need.
 
     Args:
@@ -275,6 +319,7 @@ async def worker(
         mock_email_activities: Mock email activities fixture.
         mock_leaderboard_activities: Mock leaderboard activities fixture.
         mock_time_activities: Mock time activities fixture.
+        mock_moderation_activities: Mock moderation activities fixture.
 
     Yields:
         Worker instance with all workflows and activities registered.
@@ -291,6 +336,7 @@ async def worker(
                 mock_email_activities.validate_email,
                 mock_leaderboard_activities.submit_score_to_daily_workflow,
                 mock_time_activities.create_timezone_aware_datetime,
+                mock_moderation_activities.moderate_player_name,
             ],
             activity_executor=activity_executor,
         ) as worker:

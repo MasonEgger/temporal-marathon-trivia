@@ -5,6 +5,7 @@ import asyncio
 from datetime import date, datetime, timedelta
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
@@ -17,6 +18,7 @@ with workflow.unsafe.imports_passed_through():
 
     from src.activities.config import ConfigActivities
     from src.activities.email import EmailActivities
+    from src.activities.moderation import ModerationActivities
     from src.activities.questions import QuestionsActivities
     from src.activities.time import TimeActivities
     from src.models.answer import (
@@ -240,6 +242,46 @@ class EventWorkflow:
         if request.email in self.state.player_registry:
             # Return existing player_id for duplicate email
             return self.state.player_registry[request.email]
+
+        # Moderate first_name for profanity
+        workflow.logger.info(f"Moderating first name: '{request.first_name}'")
+        first_name_is_profane = await workflow.execute_activity_method(
+            ModerationActivities.moderate_player_name,
+            request.first_name,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(
+                maximum_attempts=3,
+                initial_interval=timedelta(seconds=1),
+                maximum_interval=timedelta(seconds=10),
+                backoff_coefficient=2.0,
+            ),
+        )
+
+        if first_name_is_profane:
+            error_msg = f"First name '{request.first_name}' is inappropriate"
+            workflow.logger.error(error_msg)
+            raise ApplicationError(error_msg, type="InvalidPlayerName")
+
+        # Moderate last_name for profanity
+        workflow.logger.info(f"Moderating last name: '{request.last_name}'")
+        last_name_is_profane = await workflow.execute_activity_method(
+            ModerationActivities.moderate_player_name,
+            request.last_name,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(
+                maximum_attempts=3,
+                initial_interval=timedelta(seconds=1),
+                maximum_interval=timedelta(seconds=10),
+                backoff_coefficient=2.0,
+            ),
+        )
+
+        if last_name_is_profane:
+            error_msg = f"Last name '{request.last_name}' is inappropriate"
+            workflow.logger.error(error_msg)
+            raise ApplicationError(error_msg, type="InvalidPlayerName")
+
+        workflow.logger.info(f"Names '{request.first_name} {request.last_name}' passed moderation")
 
         # Validate email via activity
         is_valid = await workflow.execute_activity_method(

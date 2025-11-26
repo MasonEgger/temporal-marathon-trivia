@@ -263,7 +263,11 @@ async def submit_answer(
             # If we found the answered question AND show_correct_answer is enabled, show feedback
             if answered_question and config.show_correct_answer:
                 # Calculate question number (1-based)
-                answered_question_number = answered_question_index + 1 if answered_question_index is not None else answer_result.total_questions
+                answered_question_number = (
+                    answered_question_index + 1
+                    if answered_question_index is not None
+                    else answer_result.total_questions
+                )
 
                 # Pre-render completion page HTML for client-side swap after viewing feedback
                 completion_html = templates.get_template("components/completion.html").render(
