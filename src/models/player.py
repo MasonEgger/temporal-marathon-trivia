@@ -20,6 +20,7 @@ class Player:
         email: Player's email address (validated with EmailStr)
         first_name: Player's first name
         last_name: Player's last name
+        company_name: Player's company name (optional, for CSV exports)
         total_score: Cumulative score across all days (default: 0)
         daily_scores: Map of date -> score for each completed day (default: {})
         completed_days: Set of dates for which player completed all questions (default: set())
@@ -42,6 +43,7 @@ class Player:
     email: EmailStr
     first_name: str
     last_name: str
+    company_name: str | None = None
     total_score: int = 0
     daily_scores: dict[str, int] = field(default_factory=dict)
     completed_days: set[str] = field(default_factory=set)

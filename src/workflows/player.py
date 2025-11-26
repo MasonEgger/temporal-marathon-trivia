@@ -42,7 +42,9 @@ class PlayerEntityWorkflow:
         self.state: PlayerState | None = None
 
     @workflow.run
-    async def run(self, player_id: str, email: str, first_name: str, last_name: str) -> None:
+    async def run(
+        self, player_id: str, email: str, first_name: str, last_name: str, company_name: str | None = None
+    ) -> None:
         """Run method initializes player state and waits indefinitely.
 
         Args:
@@ -50,6 +52,7 @@ class PlayerEntityWorkflow:
             email: Player's email address
             first_name: Player's first name
             last_name: Player's last name
+            company_name: Player's company name (optional)
 
         Note:
             This workflow runs indefinitely using workflow.wait_condition(lambda: False)
@@ -61,6 +64,7 @@ class PlayerEntityWorkflow:
             email=email,
             first_name=first_name,
             last_name=last_name,
+            company_name=company_name,
             total_score=0,
             daily_scores={},
             completed_days=set(),
@@ -93,6 +97,7 @@ class PlayerEntityWorkflow:
                 email=self.state.player.email,
                 first_name=self.state.player.first_name,
                 last_name=self.state.player.last_name,
+                company_name=self.state.player.company_name,
                 total_score=self.state.player.total_score,
                 daily_scores=dict(self.state.player.daily_scores),
                 completed_days=set(self.state.player.completed_days),

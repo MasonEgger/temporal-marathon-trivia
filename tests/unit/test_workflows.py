@@ -40,6 +40,7 @@ def create_test_event_config() -> EventConfig:
         questions_per_day=5,
         show_correct_answer=True,
         require_work_email=False,
+        require_company_name=False,
         s3_bucket_name="test-bucket",
         s3_region="us-west-2",
     )
@@ -1120,7 +1121,7 @@ class TestEventWorkflow:
         # Start EventWorkflow with event_id and config_path
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1136,7 +1137,7 @@ class TestEventWorkflow:
         """Test that workflow loads configuration via load_event_config activity."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1158,7 +1159,7 @@ class TestEventWorkflow:
         # Start workflow - should call validate_questions_file activity
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1177,7 +1178,7 @@ class TestEventWorkflow:
         """Test that workflow query get_event_status() returns correct status."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1198,7 +1199,7 @@ class TestEventWorkflow:
         """Test that workflow tracks player_count correctly."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1217,7 +1218,7 @@ class TestEventWorkflow:
         """Test that register_player() creates new PlayerEntityWorkflow."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1232,6 +1233,7 @@ class TestEventWorkflow:
                 email="john.doe@company.com",
                 first_name="John",
                 last_name="Doe",
+                company_name=None,
             ),
         )
 
@@ -1254,7 +1256,7 @@ class TestEventWorkflow:
         """Test that register_player() returns player_id."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1282,7 +1284,7 @@ class TestEventWorkflow:
         """Test that register_player() increments player_count."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1327,7 +1329,7 @@ class TestEventWorkflow:
         """Test that register_player() stores email -> player_id mapping."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1366,7 +1368,7 @@ class TestEventWorkflow:
         """Test that register_player() returns existing player_id for duplicate email."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1416,7 +1418,7 @@ class TestEventWorkflow:
         """Test that register_player() validates email via validate_email activity."""
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1442,6 +1444,163 @@ class TestEventWorkflow:
         assert "email" in str(exc_info.value.cause).lower() or "invalid" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
+    async def test_register_player_with_company_name_stores_in_player_workflow(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() with company_name stores it in PlayerEntityWorkflow."""
+        handle = await client.start_workflow(
+            EventWorkflow.run,
+            args=["test-event-123", "tests/fixtures/config.toml"],
+            id=f"test-event-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Register a player with company_name
+        player_id = await handle.execute_update(
+            EventWorkflow.register_player,
+            RegisterPlayerRequest(
+                email="john.doe@company.com",
+                first_name="John",
+                last_name="Doe",
+                company_name="Acme Corp",
+            ),
+        )
+
+        # Verify PlayerEntityWorkflow has company_name
+        player_handle = client.get_workflow_handle(player_id)
+        player_state = await player_handle.query(PlayerEntityWorkflow.get_current_state)
+        assert player_state.player.company_name == "Acme Corp"
+
+    @pytest.mark.asyncio
+    async def test_register_player_requires_company_name_when_flag_enabled(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() requires company_name when require_company_name=True."""
+        import tempfile
+        from pathlib import Path
+
+        # Create a temporary TOML file with require_company_name=True
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write("""
+[dates]
+start_date = "2025-03-10"
+end_date = "2025-03-12"
+day_start_time = "09:00:00"
+day_end_time = "17:00:00"
+timezone = "America/Los_Angeles"
+
+[questions]
+file_path = "config/questions.json"
+per_day = 5
+
+[features]
+show_correct_answer = true
+require_work_email = false
+require_company_name = true
+
+[s3]
+bucket_name = "test-bucket"
+region = "us-west-2"
+""")
+            temp_path = f.name
+
+        try:
+            # Start EventWorkflow with config requiring company_name
+            handle = await client.start_workflow(
+                EventWorkflow.run,
+                args=["test-event-123", temp_path],
+                id=f"test-event-workflow-{uuid.uuid4()}",
+                task_queue="test-queue",
+            )
+
+            # Allow workflow to initialize state
+            await asyncio.sleep(0.1)
+
+            # Try to register without company_name (should fail)
+            with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                await handle.execute_update(
+                    EventWorkflow.register_player,
+                    RegisterPlayerRequest(
+                        email="john.doe@company.com",
+                        first_name="John",
+                        last_name="Doe",
+                        company_name=None,  # Missing company_name
+                    ),
+                )
+
+            # Verify error mentions company name
+            assert "company" in str(exc_info.value.cause).lower()
+        finally:
+            # Clean up temp file
+            Path(temp_path).unlink()
+
+    @pytest.mark.asyncio
+    async def test_register_player_rejects_empty_company_name_when_required(
+        self, client: Client, worker: Worker
+    ) -> None:
+        """Test that register_player() rejects empty company_name when required."""
+        import tempfile
+        from pathlib import Path
+
+        # Create a temporary TOML file with require_company_name=True
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write("""
+[dates]
+start_date = "2025-03-10"
+end_date = "2025-03-12"
+day_start_time = "09:00:00"
+day_end_time = "17:00:00"
+timezone = "America/Los_Angeles"
+
+[questions]
+file_path = "config/questions.json"
+per_day = 5
+
+[features]
+show_correct_answer = true
+require_work_email = false
+require_company_name = true
+
+[s3]
+bucket_name = "test-bucket"
+region = "us-west-2"
+""")
+            temp_path = f.name
+
+        try:
+            # Start EventWorkflow with config requiring company_name
+            handle = await client.start_workflow(
+                EventWorkflow.run,
+                args=["test-event-123", temp_path],
+                id=f"test-event-workflow-{uuid.uuid4()}",
+                task_queue="test-queue",
+            )
+
+            # Allow workflow to initialize state
+            await asyncio.sleep(0.1)
+
+            # Try to register with empty company_name (should fail)
+            with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                await handle.execute_update(
+                    EventWorkflow.register_player,
+                    RegisterPlayerRequest(
+                        email="jane.smith@company.com",
+                        first_name="Jane",
+                        last_name="Smith",
+                        company_name="",  # Empty string
+                    ),
+                )
+
+            # Verify error mentions company name
+            assert "company" in str(exc_info.value.cause).lower()
+        finally:
+            # Clean up temp file
+            Path(temp_path).unlink()
+
+    @pytest.mark.asyncio
     async def test_event_workflow_schedules_daily_workflow_for_each_event_day(
         self, client: Client, worker: Worker
     ) -> None:
@@ -1449,7 +1608,7 @@ class TestEventWorkflow:
         # Start EventWorkflow with 3-day event
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1481,7 +1640,7 @@ class TestEventWorkflow:
         # Start EventWorkflow
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1511,7 +1670,7 @@ class TestEventWorkflow:
         # Start EventWorkflow
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )
@@ -1538,7 +1697,7 @@ class TestEventWorkflow:
         # Start EventWorkflow
         handle = await client.start_workflow(
             EventWorkflow.run,
-            args=["test-event-123", "config/event.toml"],
+            args=["test-event-123", "tests/fixtures/config.toml"],
             id=f"test-event-workflow-{uuid.uuid4()}",
             task_queue="test-queue",
         )

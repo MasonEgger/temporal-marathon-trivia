@@ -104,6 +104,7 @@ class ConfigActivities:
             questions_per_day=questions_section["per_day"],
             show_correct_answer=features_section["show_correct_answer"],
             require_work_email=features_section["require_work_email"],
+            require_company_name=features_section["require_company_name"],
             s3_bucket_name=s3_section["bucket_name"],
             s3_region=s3_section["region"],
         )
@@ -171,6 +172,7 @@ class ConfigActivities:
             title=ui_branding_section["title"],
             description=ui_branding_section["description"],
             base_url=ui_branding_section["base_url"],
+            welcome_message=ui_branding_section["welcome_message"],
             completion_message=ui_messages_section["completion_message"],
             day_over_message=ui_messages_section["day_over_message"],
             not_started_message=ui_messages_section["not_started_message"],

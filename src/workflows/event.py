@@ -212,7 +212,7 @@ class EventWorkflow:
         returns the existing player_id without creating a new workflow.
 
         Args:
-            request: RegisterPlayerRequest containing email, first_name, last_name
+            request: RegisterPlayerRequest containing email, first_name, last_name, company_name
 
         Returns:
             player_id: UUID string identifying the player's workflow.
@@ -257,6 +257,11 @@ class EventWorkflow:
             else:
                 raise ApplicationError(f"Invalid email address: {request.email}")
 
+        # Validate company_name if required
+        if self.state.config.require_company_name:
+            if not request.company_name or request.company_name.strip() == "":
+                raise ApplicationError("Company name is required")
+
         # Generate meaningful player_id using initials (e.g., "test-player-AS" for Alice Smith)
         first_initial = request.first_name[0].upper() if request.first_name else "X"
         last_initial = request.last_name[0].upper() if request.last_name else "X"
@@ -269,7 +274,7 @@ class EventWorkflow:
         # Await the start but don't await the handle (runs indefinitely)
         await workflow.start_child_workflow(
             PlayerEntityWorkflow.run,
-            args=[player_id, request.email, request.first_name, request.last_name],
+            args=[player_id, request.email, request.first_name, request.last_name, request.company_name],
             id=player_id,  # Use player_id as workflow_id for idempotency
             task_queue=workflow.info().task_queue,
         )

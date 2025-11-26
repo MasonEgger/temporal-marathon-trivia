@@ -19,6 +19,7 @@ class UXConfig:
         title: Event title displayed on landing page.
         description: Event description/tagline.
         base_url: Base URL for the application.
+        welcome_message: Personalized greeting shown on dashboard (supports {first_name} and {last_name}).
         completion_message: Message shown when player completes a day.
         day_over_message: Message shown when day has ended.
         not_started_message: Message shown when day hasn't started yet.
@@ -52,6 +53,7 @@ class UXConfig:
     title: str
     description: str
     base_url: str
+    welcome_message: str
     completion_message: str
     day_over_message: str
     not_started_message: str

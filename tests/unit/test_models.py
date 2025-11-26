@@ -279,6 +279,47 @@ class TestPlayerModel:
         # Verify error mentions email
         assert "email" in str(exc_info.value).lower()
 
+    def test_player_with_company_name_creates_successfully(self) -> None:
+        """Test that Player with company_name creates successfully."""
+        from src.models.player import Player
+
+        player = Player(
+            id="player123",
+            email="john.doe@example.com",
+            first_name="John",
+            last_name="Doe",
+            company_name="Acme Corp",
+        )
+
+        assert player.company_name == "Acme Corp"
+
+    def test_player_without_company_name_defaults_to_none(self) -> None:
+        """Test that Player without company_name defaults to None."""
+        from src.models.player import Player
+
+        player = Player(
+            id="player123",
+            email="john.doe@example.com",
+            first_name="John",
+            last_name="Doe",
+        )
+
+        assert player.company_name is None
+
+    def test_player_with_empty_company_name_stores_empty_string(self) -> None:
+        """Test that Player with empty company_name stores empty string."""
+        from src.models.player import Player
+
+        player = Player(
+            id="player123",
+            email="john.doe@example.com",
+            first_name="John",
+            last_name="Doe",
+            company_name="",
+        )
+
+        assert player.company_name == ""
+
 
 class TestLeaderboardEntryModel:
     """Test suite for LeaderboardEntry data model."""
@@ -352,6 +393,7 @@ class TestEventConfigModel:
             questions_per_day=5,
             show_correct_answer=True,
             require_work_email=False,
+            require_company_name=False,
             s3_bucket_name="test-bucket",
             s3_region="us-west-2",
         )
@@ -378,6 +420,7 @@ class TestEventConfigModel:
             questions_per_day=5,
             show_correct_answer=True,
             require_work_email=False,
+            require_company_name=False,
             s3_bucket_name="bucket",
             s3_region="us-west-2",
         )
@@ -400,6 +443,7 @@ class TestEventConfigModel:
                 questions_per_day=5,
                 show_correct_answer=True,
                 require_work_email=False,
+                require_company_name=False,
                 s3_bucket_name="bucket",
                 s3_region="us-west-2",
             )
@@ -422,6 +466,7 @@ class TestEventConfigModel:
             questions_per_day=5,
             show_correct_answer=True,
             require_work_email=False,
+            require_company_name=False,
             s3_bucket_name="bucket",
             s3_region="us-west-2",
         )
@@ -442,6 +487,7 @@ class TestEventConfigModel:
                 questions_per_day=5,
                 show_correct_answer=True,
                 require_work_email=False,
+                require_company_name=False,
                 s3_bucket_name="bucket",
                 s3_region="us-west-2",
             )
@@ -464,6 +510,7 @@ class TestEventConfigModel:
             questions_per_day=10,  # Positive integer
             show_correct_answer=True,
             require_work_email=False,
+            require_company_name=False,
             s3_bucket_name="bucket",
             s3_region="us-west-2",
         )
@@ -486,6 +533,7 @@ class TestEventConfigModel:
                 questions_per_day=0,  # Invalid: must be positive
                 show_correct_answer=True,
                 require_work_email=False,
+                require_company_name=False,
                 s3_bucket_name="bucket",
                 s3_region="us-west-2",
             )
@@ -507,6 +555,7 @@ class TestEventConfigModel:
             questions_per_day=5,
             show_correct_answer=True,
             require_work_email=False,
+            require_company_name=False,
             s3_bucket_name="bucket",
             s3_region="us-west-2",
         )
@@ -532,6 +581,7 @@ class TestEventConfigModel:
             questions_per_day=5,
             show_correct_answer=True,
             require_work_email=False,
+            require_company_name=False,
             s3_bucket_name="bucket",
             s3_region="us-west-2",
         )
@@ -540,3 +590,74 @@ class TestEventConfigModel:
 
         assert len(dates) == 1
         assert dates[0] == date(2025, 3, 10)
+
+    def test_event_config_with_require_company_name_true(self) -> None:
+        """Test that EventConfig with require_company_name=True creates successfully."""
+        from src.models.config import EventConfig
+
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            require_company_name=True,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+
+        assert config.require_company_name is True
+
+    def test_event_config_with_require_company_name_false(self) -> None:
+        """Test that EventConfig with require_company_name=False creates successfully."""
+        from src.models.config import EventConfig
+
+        config = EventConfig(
+            start_date=date(2025, 3, 10),
+            end_date=date(2025, 3, 12),
+            day_start_time=time(9, 0),
+            day_end_time=time(17, 0),
+            timezone="America/Los_Angeles",
+            questions_file_path="config/questions.json",
+            questions_per_day=5,
+            show_correct_answer=True,
+            require_work_email=False,
+            require_company_name=False,
+            s3_bucket_name="bucket",
+            s3_region="us-west-2",
+        )
+
+        assert config.require_company_name is False
+
+
+class TestRegisterPlayerRequest:
+    """Test suite for RegisterPlayerRequest data model."""
+
+    def test_register_player_request_with_company_name(self) -> None:
+        """Test that RegisterPlayerRequest with company_name creates successfully."""
+        from src.models.answer import RegisterPlayerRequest
+
+        request = RegisterPlayerRequest(
+            email="john.doe@company.com",
+            first_name="John",
+            last_name="Doe",
+            company_name="Acme Corp",
+        )
+
+        assert request.company_name == "Acme Corp"
+
+    def test_register_player_request_without_company_name_defaults_to_none(self) -> None:
+        """Test that RegisterPlayerRequest without company_name defaults to None."""
+        from src.models.answer import RegisterPlayerRequest
+
+        request = RegisterPlayerRequest(
+            email="john.doe@company.com",
+            first_name="John",
+            last_name="Doe",
+        )
+
+        assert request.company_name is None

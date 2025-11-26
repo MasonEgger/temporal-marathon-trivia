@@ -127,12 +127,14 @@ class RegisterPlayerRequest:
         email: Player's email address (used for duplicate detection)
         first_name: Player's first name
         last_name: Player's last name
+        company_name: Player's company name (optional)
 
     Example:
         >>> request = RegisterPlayerRequest(
         ...     email="john.doe@company.com",
         ...     first_name="John",
-        ...     last_name="Doe"
+        ...     last_name="Doe",
+        ...     company_name="Acme Corp"
         ... )
         >>> player_id = await handle.execute_update(
         ...     EventWorkflow.register_player, request
@@ -142,6 +144,7 @@ class RegisterPlayerRequest:
     email: str
     first_name: str
     last_name: str
+    company_name: str | None = None
 
 
 @dataclass

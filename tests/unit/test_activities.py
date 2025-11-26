@@ -115,6 +115,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"
@@ -148,6 +149,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"
@@ -256,6 +258,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"
@@ -293,6 +296,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"
@@ -331,6 +335,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"
@@ -368,6 +373,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"

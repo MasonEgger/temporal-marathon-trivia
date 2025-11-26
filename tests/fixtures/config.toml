@@ -5,6 +5,7 @@
 title = "Test Event Trivia"
 description = "A test trivia event"
 base_url = "test.example.com"
+welcome_message = "Welcome back, {first_name} {last_name}!"
 
 [dates]
 start_date = "2025-03-10"
@@ -20,6 +21,7 @@ per_day = 5
 [features]
 show_correct_answer = true
 require_work_email = true
+require_company_name = false
 
 [s3]
 bucket_name = "test-marathon-trivia"

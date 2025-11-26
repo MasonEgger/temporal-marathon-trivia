@@ -28,6 +28,7 @@ class EventConfig:
         questions_per_day: Number of questions per day (must be positive).
         show_correct_answer: Whether to show correct answer after submission.
         require_work_email: Whether to block consumer email domains.
+        require_company_name: Whether to require company name during registration.
         s3_bucket_name: S3 bucket for CSV exports.
         s3_region: AWS region for S3 bucket.
 
@@ -47,6 +48,7 @@ class EventConfig:
         ...     questions_per_day=5,
         ...     show_correct_answer=True,
         ...     require_work_email=False,
+        ...     require_company_name=False,
         ...     s3_bucket_name="trivia-exports",
         ...     s3_region="us-west-2"
         ... )
@@ -63,6 +65,7 @@ class EventConfig:
     questions_per_day: int
     show_correct_answer: bool
     require_work_email: bool
+    require_company_name: bool
     s3_bucket_name: str
     s3_region: str
 

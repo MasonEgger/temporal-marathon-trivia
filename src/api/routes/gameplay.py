@@ -79,6 +79,7 @@ async def start_day(
         # Get player state to determine actual question number (for resume functionality)
         player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
         question_number = player_state.current_question_index + 1  # Convert 0-based to 1-based
+        total_questions = len(player_state.current_questions) if player_state.current_questions else 0
 
         # Render question template with question data
         return templates.TemplateResponse(
@@ -89,7 +90,7 @@ async def start_day(
                 "question": question,
                 "date": date,
                 "question_number": question_number,
-                # Total questions not available yet - will be added later
+                "total_questions": total_questions,
             },
         )
 
@@ -183,32 +184,129 @@ async def submit_answer(
 
         # Route response based on AnswerResult (OUR application logic)
         if answer_result.next_question:
-            # More questions remain - render next question
-            return templates.TemplateResponse(
-                request,
-                name="components/question.html",
-                context={
-                    "request": request,
-                    "question": answer_result.next_question,
-                    "date": date,
-                    "question_number": answer_result.current_score + 1,
-                    "is_correct": answer_result.is_correct,
-                    "correct_answer": answer_result.correct_answer,
-                },
-            )
+            # More questions remain - render next question with feedback about previous
+            # Get player state to find the question they just answered (for feedback display)
+            player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
+            current_questions = player_state.current_questions or []
+
+            # Find the answered question by ID and its position
+            answered_question = None
+            answered_question_index = None
+            for i, q in enumerate(current_questions):
+                if q.id == question_id:
+                    answered_question = q
+                    answered_question_index = i
+                    break
+
+            # If we found the answered question AND show_correct_answer is enabled, show feedback
+            if answered_question and config.show_correct_answer:
+                # Calculate question numbers (1-based)
+                answered_question_number = answered_question_index + 1 if answered_question_index is not None else 1
+                next_question_number = answered_question_number + 1
+
+                # Pre-render next question HTML for client-side swap after viewing feedback
+                next_question_html = templates.get_template("components/question.html").render(
+                    {
+                        "request": request,
+                        "question": answer_result.next_question,
+                        "date": date,
+                        "question_number": next_question_number,
+                        "total_questions": answer_result.total_questions,
+                    }
+                )
+
+                # Render answer-result template showing answered question with highlights
+                return templates.TemplateResponse(
+                    request,
+                    name="components/answer-result.html",
+                    context={
+                        "request": request,
+                        "answered_question": answered_question,
+                        "user_answer": answer_choice,
+                        "correct_answer": answer_result.correct_answer,
+                        "is_correct": answer_result.is_correct,
+                        "question_number": answered_question_number,  # Actual question number
+                        "current_score": answer_result.current_score,
+                        "total_questions": answer_result.total_questions,
+                        "next_question_html": next_question_html,
+                        "date": date,
+                    },
+                )
+            else:
+                # Fallback: Just show next question directly (no feedback)
+                return templates.TemplateResponse(
+                    request,
+                    name="components/question.html",
+                    context={
+                        "request": request,
+                        "question": answer_result.next_question,
+                        "date": date,
+                        "question_number": answer_result.current_score + 1,
+                        "total_questions": answer_result.total_questions,
+                    },
+                )
         else:
-            # All questions answered - render completion
-            return templates.TemplateResponse(
-                request,
-                name="components/completion.html",
-                context={
-                    "request": request,
-                    "completion_message": answer_result.completion_message,
-                    "score": answer_result.current_score,
-                    "total": answer_result.total_questions,
-                    "date": date,
-                },
-            )
+            # All questions answered - show feedback for last question, then completion
+            # Get player state to find the last question they just answered
+            player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
+            current_questions = player_state.current_questions or []
+
+            # Find the answered question by ID and its position
+            answered_question = None
+            answered_question_index = None
+            for i, q in enumerate(current_questions):
+                if q.id == question_id:
+                    answered_question = q
+                    answered_question_index = i
+                    break
+
+            # If we found the answered question AND show_correct_answer is enabled, show feedback
+            if answered_question and config.show_correct_answer:
+                # Calculate question number (1-based)
+                answered_question_number = answered_question_index + 1 if answered_question_index is not None else answer_result.total_questions
+
+                # Pre-render completion page HTML for client-side swap after viewing feedback
+                completion_html = templates.get_template("components/completion.html").render(
+                    {
+                        "request": request,
+                        "completion_message": answer_result.completion_message,
+                        "score": answer_result.current_score,
+                        "total": answer_result.total_questions,
+                        "date": date,
+                    }
+                )
+
+                # Render answer-result template showing final question with highlights
+                return templates.TemplateResponse(
+                    request,
+                    name="components/answer-result.html",
+                    context={
+                        "request": request,
+                        "answered_question": answered_question,
+                        "user_answer": answer_choice,
+                        "correct_answer": answer_result.correct_answer,
+                        "is_correct": answer_result.is_correct,
+                        "question_number": answered_question_number,
+                        "current_score": answer_result.current_score,
+                        "total_questions": answer_result.total_questions,
+                        "next_question_html": completion_html,  # Completion instead of next question
+                        "is_last_question": True,  # Signal to show "View Results" instead of "Next Question"
+                        "date": date,
+                    },
+                )
+            else:
+                # Fallback: Show completion directly (no feedback)
+                return templates.TemplateResponse(
+                    request,
+                    name="components/completion.html",
+                    context={
+                        "request": request,
+                        "completion_message": answer_result.completion_message,
+                        "score": answer_result.current_score,
+                        "total": answer_result.total_questions,
+                        "date": date,
+                    },
+                )
 
     except ApplicationError as e:
         # Workflow validation errors (invalid answer_choice, etc.)

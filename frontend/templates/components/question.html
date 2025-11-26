@@ -1,4 +1,4 @@
-<!-- Question Card Component -->
+<!-- Question Card Component (always interactive) -->
 <div class="question-container max-w-3xl mx-auto">
     <!-- Card wrapper -->
     <div class="bg-white shadow-2xl rounded-3xl p-6 md:p-10 border-2 border-gray-100">
@@ -27,89 +27,27 @@
 
             <!-- Options grid -->
             <div class="options space-y-3">
-                <!-- Option A -->
-                <label class="option-label group relative block cursor-pointer">
-                    <input
-                        type="radio"
-                        name="answer_choice"
-                        value="A"
-                        required
-                        class="peer sr-only"
-                    >
-                    <div class="option-box border-3 border-gray-300 rounded-2xl p-5 md:p-6 transition-all duration-200 peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:shadow-lg hover:border-blue-400 hover:bg-blue-25 hover:shadow-md">
-                        <div class="flex items-start gap-4">
-                            <span class="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-lg md:text-xl rounded-xl peer-checked:bg-blue-600 peer-checked:text-white transition-colors">
-                                A
-                            </span>
-                            <span class="flex-1 text-base md:text-xl text-gray-800 font-medium leading-relaxed pt-1 md:pt-2">
-                                {{ question.options['A'] }}
-                            </span>
+                {% for choice, text in question.options.items() %}
+                    <label class="option-label group relative block cursor-pointer">
+                        <input
+                            type="radio"
+                            name="answer_choice"
+                            value="{{ choice }}"
+                            required
+                            class="peer sr-only"
+                        >
+                        <div class="option-box border-3 border-gray-300 rounded-2xl p-5 md:p-6 transition-all duration-200 peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:shadow-lg hover:border-blue-400 hover:bg-blue-25 hover:shadow-md">
+                            <div class="flex items-start gap-4">
+                                <span class="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-lg md:text-xl rounded-xl transition-colors group-hover:bg-blue-200 peer-checked:bg-blue-600 peer-checked:text-white">
+                                    {{ choice }}
+                                </span>
+                                <span class="flex-1 text-base md:text-xl text-gray-800 font-medium leading-relaxed pt-1 md:pt-2">
+                                    {{ text }}
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                </label>
-
-                <!-- Option B -->
-                <label class="option-label group relative block cursor-pointer">
-                    <input
-                        type="radio"
-                        name="answer_choice"
-                        value="B"
-                        required
-                        class="peer sr-only"
-                    >
-                    <div class="option-box border-3 border-gray-300 rounded-2xl p-5 md:p-6 transition-all duration-200 peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:shadow-lg hover:border-blue-400 hover:bg-blue-25 hover:shadow-md">
-                        <div class="flex items-start gap-4">
-                            <span class="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-lg md:text-xl rounded-xl peer-checked:bg-blue-600 peer-checked:text-white transition-colors">
-                                B
-                            </span>
-                            <span class="flex-1 text-base md:text-xl text-gray-800 font-medium leading-relaxed pt-1 md:pt-2">
-                                {{ question.options['B'] }}
-                            </span>
-                        </div>
-                    </div>
-                </label>
-
-                <!-- Option C -->
-                <label class="option-label group relative block cursor-pointer">
-                    <input
-                        type="radio"
-                        name="answer_choice"
-                        value="C"
-                        required
-                        class="peer sr-only"
-                    >
-                    <div class="option-box border-3 border-gray-300 rounded-2xl p-5 md:p-6 transition-all duration-200 peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:shadow-lg hover:border-blue-400 hover:bg-blue-25 hover:shadow-md">
-                        <div class="flex items-start gap-4">
-                            <span class="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-lg md:text-xl rounded-xl peer-checked:bg-blue-600 peer-checked:text-white transition-colors">
-                                C
-                            </span>
-                            <span class="flex-1 text-base md:text-xl text-gray-800 font-medium leading-relaxed pt-1 md:pt-2">
-                                {{ question.options['C'] }}
-                            </span>
-                        </div>
-                    </div>
-                </label>
-
-                <!-- Option D -->
-                <label class="option-label group relative block cursor-pointer">
-                    <input
-                        type="radio"
-                        name="answer_choice"
-                        value="D"
-                        required
-                        class="peer sr-only"
-                    >
-                    <div class="option-box border-3 border-gray-300 rounded-2xl p-5 md:p-6 transition-all duration-200 peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:shadow-lg hover:border-blue-400 hover:bg-blue-25 hover:shadow-md">
-                        <div class="flex items-start gap-4">
-                            <span class="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-blue-100 text-blue-700 font-bold text-lg md:text-xl rounded-xl peer-checked:bg-blue-600 peer-checked:text-white transition-colors">
-                                D
-                            </span>
-                            <span class="flex-1 text-base md:text-xl text-gray-800 font-medium leading-relaxed pt-1 md:pt-2">
-                                {{ question.options['D'] }}
-                            </span>
-                        </div>
-                    </div>
-                </label>
+                    </label>
+                {% endfor %}
             </div>
 
             <!-- Submit button -->

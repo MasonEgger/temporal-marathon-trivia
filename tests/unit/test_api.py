@@ -170,6 +170,79 @@ class TestPlayerRegistration:
         assert "text/html" in response.headers["content-type"]
         assert "error" in response.text.lower()
 
+    def test_join_endpoint_accepts_company_name_form_field(self) -> None:
+        """Test that POST /api/join accepts company_name form field.
+
+        This tests OUR application logic - that company_name is passed to RegisterPlayerRequest.
+        """
+        from src.api.main import app
+
+        # Manually set up app.state
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        mock_handle.execute_update = AsyncMock(return_value="player-123")
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/join",
+            data={
+                "first_name": "John",
+                "last_name": "Doe",
+                "email": "john.doe@company.com",
+                "company_name": "Acme Corp",
+            },
+            follow_redirects=False,
+        )
+
+        # Verify endpoint responds successfully
+        assert response.status_code == 303
+
+        # Verify RegisterPlayerRequest was created with company_name
+        # by checking the mock was called
+        mock_handle.execute_update.assert_called_once()
+        call_args = mock_handle.execute_update.call_args
+        register_request = call_args[0][1]  # Second positional arg
+        assert register_request.company_name == "Acme Corp"
+
+    def test_join_endpoint_handles_missing_company_name(self) -> None:
+        """Test that POST /api/join handles missing company_name (defaults to None).
+
+        This tests OUR application logic - backward compatibility.
+        """
+        from src.api.main import app
+
+        # Manually set up app.state
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        mock_handle.execute_update = AsyncMock(return_value="player-123")
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/join",
+            data={
+                "first_name": "Jane",
+                "last_name": "Smith",
+                "email": "jane@example.com",
+                # No company_name provided
+            },
+            follow_redirects=False,
+        )
+
+        # Verify endpoint responds successfully
+        assert response.status_code == 303
+
+        # Verify RegisterPlayerRequest was created with company_name=None
+        mock_handle.execute_update.assert_called_once()
+        call_args = mock_handle.execute_update.call_args
+        register_request = call_args[0][1]
+        assert register_request.company_name is None
+
 
 class TestGameplayStartDay:
     """Tests for GET /api/day/{date}/start endpoint.

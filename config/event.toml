@@ -16,7 +16,8 @@ per_day = 5
 
 [features]
 show_correct_answer = true
-require_work_email = true  # Set to true to block gmail, yahoo, etc.
+require_work_email = false  # Set to true to block gmail, yahoo, etc.
+require_company_name = false  # Set to true to make company name required during registration
 
 [s3]
 bucket_name = "marathon-trivia-exports"
@@ -28,6 +29,7 @@ region = "us-west-2"
 title = "Temporal re:Invent 2025 Trivia"
 description = "Test your tech knowledge and win prizes!"
 base_url = "trivia.ziggy.codes"
+welcome_message = "Hello, {first_name} {last_name}! 👋"
 
 [ui.messages]
 completion_message = "🎉 Great job! Check the leaderboard to see your ranking."

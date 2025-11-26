@@ -60,8 +60,14 @@ class MockConfigActivities:
 
     @activity.defn(name="load_event_config")
     def load_event_config(self, config_path: str) -> EventConfig:
-        """Mock load_event_config that returns test config."""
-        return create_test_event_config()
+        """Mock load_event_config that actually reads the config file.
+
+        This allows tests to use custom TOML files with different settings
+        (e.g., require_company_name=True) for validation testing.
+        """
+        from src.activities.config import ConfigActivities
+        real_activities = ConfigActivities()
+        return real_activities.load_event_config(config_path)
 
     @activity.defn(name="validate_questions_file")
     def validate_questions_file(self, file_path: str, config: EventConfig) -> None:
@@ -132,6 +138,7 @@ def create_test_event_config() -> EventConfig:
         questions_per_day=5,
         show_correct_answer=True,
         require_work_email=False,
+        require_company_name=False,
         s3_bucket_name="test-bucket",
         s3_region="us-west-2",
     )

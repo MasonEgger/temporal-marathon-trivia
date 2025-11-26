@@ -29,6 +29,7 @@ async def join(
     first_name: str = Form(),
     last_name: str = Form(),
     email: str = Form(),
+    company_name: str | None = Form(None),
 ) -> Response:
     """Register a new player and return HTML success fragment.
 
@@ -36,6 +37,7 @@ async def join(
         first_name: Player's first name from form
         last_name: Player's last name from form
         email: Player's email address from form
+        company_name: Player's company name from form (optional)
 
     Returns:
         HTMLResponse with success message and player_id cookie set,
@@ -59,6 +61,7 @@ async def join(
             email=email,
             first_name=first_name,
             last_name=last_name,
+            company_name=company_name,
         )
         player_id = await handle.execute_update(
             EventWorkflow.register_player,

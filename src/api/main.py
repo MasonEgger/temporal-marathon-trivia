@@ -98,6 +98,7 @@ async def landing_page(
     context = {
         "request": request,
         "config": config,
+        "event_config": event_config,
         "player_id": player_id,
     }
 
@@ -117,10 +118,17 @@ async def landing_page(
             player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
             context["player_completed_days"] = player_state.player.completed_days
             context["player_current_day"] = player_state.current_day  # For showing "Resume" button
+
+            # Format welcome message with player's name
+            context["welcome_message"] = config.welcome_message.format(
+                first_name=player_state.player.first_name,
+                last_name=player_state.player.last_name
+            )
         except Exception:
             # If we can't get player state, show empty completed days and no current day
             context["player_completed_days"] = set()
             context["player_current_day"] = None
+            context["welcome_message"] = "Welcome back!"  # Fallback message
 
     return templates.TemplateResponse(request, "landing.html", context)
 
