@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from temporalio.client import Client
 from temporalio.exceptions import ApplicationError
 
+from src.api.player_verification import verify_player_workflow
 from src.models.answer import SubmitAnswerRequest
 from src.workflows.player import PlayerEntityWorkflow
 
@@ -54,11 +55,20 @@ async def start_day(
         # Get Temporal client from app state
         client: Client = request.app.state.temporal_client
 
-        # Get PlayerEntityWorkflow handle using player_id from cookie
-        handle = client.get_workflow_handle(
-            workflow_id=player_id,
-            run_id=None,
-        )
+        # Verify PlayerEntityWorkflow exists (handles server restarts gracefully)
+        handle = await verify_player_workflow(player_id, client)
+        if handle is None:
+            # Workflow doesn't exist and couldn't be recreated - clear cookie and require re-registration
+            response = templates.TemplateResponse(
+                request,
+                name="components/error.html",
+                context={
+                    "request": request,
+                    "error": "Session expired. Please register again to continue playing.",
+                },
+            )
+            response.delete_cookie(key="player_id")
+            return response
 
         # Call start_day update handler to get first question
         question = await handle.execute_update(
@@ -141,11 +151,20 @@ async def submit_answer(
         client: Client = request.app.state.temporal_client
         config = request.app.state.config
 
-        # Get PlayerEntityWorkflow handle using player_id from cookie
-        handle = client.get_workflow_handle(
-            workflow_id=player_id,
-            run_id=None,
-        )
+        # Verify PlayerEntityWorkflow exists (handles server restarts gracefully)
+        handle = await verify_player_workflow(player_id, client)
+        if handle is None:
+            # Workflow doesn't exist - clear cookie and require re-registration
+            response = templates.TemplateResponse(
+                request,
+                name="components/error.html",
+                context={
+                    "request": request,
+                    "error": "Session expired. Please register again to continue playing.",
+                },
+            )
+            response.delete_cookie(key="player_id")
+            return response
 
         # Call submit_answer update handler with type-safe request model
         answer_result = await handle.execute_update(

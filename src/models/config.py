@@ -70,9 +70,7 @@ class EventConfig:
     def validate_dates(self) -> EventConfig:
         """Validate that end_date is on or after start_date."""
         if self.end_date < self.start_date:
-            raise ValueError(
-                f"end_date ({self.end_date}) must be on or after start_date ({self.start_date})"
-            )
+            raise ValueError(f"end_date ({self.end_date}) must be on or after start_date ({self.start_date})")
         return self
 
     @model_validator(mode="after")

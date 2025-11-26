@@ -13,9 +13,7 @@ class TimeActivities:
     """Activity class for time and date conversion operations."""
 
     @activity.defn
-    def create_timezone_aware_datetime(
-        self, request: CreateTimezoneAwareDatetimeRequest
-    ) -> datetime:
+    def create_timezone_aware_datetime(self, request: CreateTimezoneAwareDatetimeRequest) -> datetime:
         """Create a timezone-aware datetime from date, time components, and timezone.
 
         This activity handles timezone-aware datetime creation, which cannot be done

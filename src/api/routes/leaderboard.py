@@ -42,7 +42,7 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
     temporal_client: Client = request.app.state.temporal_client
 
     # Check cache first (30s TTL)
-    cached_data = redis.get("leaderboard:full")
+    cached_data = await redis.get("leaderboard:full")
     if cached_data:
         # Cache hit - deserialize and render
         leaderboard_entries = [LeaderboardEntry(**entry) for entry in json.loads(cached_data)]
@@ -69,11 +69,12 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
     daily_workflow_ids: dict[str, str] = event_status.daily_workflow_ids
 
     # Query each DailyWorkflow for its leaderboard
-    all_daily_leaderboards: list[list[LeaderboardEntry]] = []
-    for _date_str, workflow_id in sorted(daily_workflow_ids.items()):
+    # Structure: list of (date, leaderboard) tuples
+    all_daily_leaderboards: list[tuple[str, list[LeaderboardEntry]]] = []
+    for date_str, workflow_id in sorted(daily_workflow_ids.items()):
         daily_handle = temporal_client.get_workflow_handle(workflow_id)
         daily_leaderboard = await daily_handle.query(DailyWorkflow.get_daily_leaderboard)
-        all_daily_leaderboards.append(daily_leaderboard)
+        all_daily_leaderboards.append((date_str, daily_leaderboard))
 
     # Aggregate leaderboards
     aggregated_leaderboard = aggregate_leaderboards(all_daily_leaderboards)
@@ -95,7 +96,7 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
             for entry in aggregated_leaderboard
         ]
     )
-    redis.set("leaderboard:full", cache_data, ex=30)
+    await redis.set("leaderboard:full", cache_data, ex=30)
 
     # Render template
     return templates.TemplateResponse(
@@ -109,7 +110,7 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
 
 
 def aggregate_leaderboards(
-    daily_leaderboards: list[list[LeaderboardEntry]],
+    daily_leaderboards: list[tuple[str, list[LeaderboardEntry]]],
 ) -> list[LeaderboardEntry]:
     """Aggregate player scores across multiple daily leaderboards.
 
@@ -121,15 +122,15 @@ def aggregate_leaderboards(
     5. Assigns ranks with tie handling (tied players share rank, next rank adjusts)
 
     Args:
-        daily_leaderboards: List of daily leaderboard entries from each DailyWorkflow
+        daily_leaderboards: List of (date, leaderboard) tuples from each DailyWorkflow
 
     Returns:
         List of aggregated LeaderboardEntry objects, sorted by rank
 
     Example:
-        >>> day1 = [LeaderboardEntry(1, "Alice B.", 50, {"2025-03-10": 50}, "alice@example.com")]
-        >>> day2 = [LeaderboardEntry(1, "Alice B.", 60, {"2025-03-11": 60}, "alice@example.com")]
-        >>> result = aggregate_leaderboards([day1, day2])
+        >>> day1 = [LeaderboardEntry(1, "Alice B.", 50, {}, "alice@example.com")]
+        >>> day2 = [LeaderboardEntry(1, "Alice B.", 60, {}, "alice@example.com")]
+        >>> result = aggregate_leaderboards([("2025-03-10", day1), ("2025-03-11", day2)])
         >>> result[0].total_score
         110
         >>> result[0].daily_scores
@@ -138,7 +139,7 @@ def aggregate_leaderboards(
     # Aggregate players by email
     player_data: dict[str, dict[str, Any]] = {}
 
-    for daily_leaderboard in daily_leaderboards:
+    for date_str, daily_leaderboard in daily_leaderboards:
         for entry in daily_leaderboard:
             if entry.email not in player_data:
                 # First time seeing this player
@@ -148,8 +149,9 @@ def aggregate_leaderboards(
                     "daily_scores": {},
                 }
 
-            # Merge daily scores
-            player_data[entry.email]["daily_scores"].update(entry.daily_scores)
+            # Map total_score from DailyWorkflow to the correct date in daily_scores
+            # DailyWorkflow returns total_score for that day but daily_scores is empty
+            player_data[entry.email]["daily_scores"][date_str] = entry.total_score
 
     # Calculate total scores and create entries
     aggregated_entries = []

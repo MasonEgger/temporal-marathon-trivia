@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import date
 
+from dotenv import load_dotenv
 from fastapi import Cookie, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -14,6 +15,9 @@ from redis.asyncio import from_url
 from src.activities.config import ConfigActivities
 from src.api.routes import gameplay, leaderboard, player
 from src.temporal_client import create_temporal_client
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 @asynccontextmanager

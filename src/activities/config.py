@@ -154,9 +154,7 @@ class ConfigActivities:
         try:
             ui_messages_section = data["ui"]["messages"]
         except KeyError as e:
-            raise ValueError(
-                "Missing required section '[ui.messages]' in configuration file"
-            ) from e
+            raise ValueError("Missing required section '[ui.messages]' in configuration file") from e
 
         try:
             ui_colors_section = data["ui"]["colors"]

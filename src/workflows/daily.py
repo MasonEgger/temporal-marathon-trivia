@@ -70,11 +70,14 @@ def calculate_leaderboard(
         display_name = f"{first_name} {last_name[0]}." if last_name else first_name
 
         # Create leaderboard entry
+        # Note: DailyWorkflow knows about its own date from self.state.date
+        # We need access to the date to populate daily_scores properly
+        # For now, daily_scores will be empty and API will use total_score
         entry = LeaderboardEntry(
             rank=current_rank,
             display_name=display_name,
             total_score=score,
-            daily_scores={},  # Will be populated by API layer later
+            daily_scores={},  # Empty for now - API will map total_score to the correct date
             email=email,
         )
         leaderboard.append(entry)
@@ -242,6 +245,4 @@ class DailyWorkflow:
 
         # Reject duplicate submissions
         if request.player_id in self.state.completed_players:
-            raise ValueError(
-                f"Player {request.player_id} has already submitted a score for this day"
-            )
+            raise ValueError(f"Player {request.player_id} has already submitted a score for this day")

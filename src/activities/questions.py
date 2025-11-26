@@ -38,9 +38,7 @@ class QuestionsActivities:
         # Check if file exists
         path = Path(file_path)
         if not path.exists():
-            raise FileNotFoundError(
-                f"Questions file not found: {file_path}. Please verify the file path is correct."
-            )
+            raise FileNotFoundError(f"Questions file not found: {file_path}. Please verify the file path is correct.")
 
         # Read and parse JSON
         try:
@@ -48,8 +46,7 @@ class QuestionsActivities:
                 data = json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(
-                f"Failed to parse JSON file '{file_path}': {e}. "
-                "Ensure the file contains valid JSON."
+                f"Failed to parse JSON file '{file_path}': {e}. Ensure the file contains valid JSON."
             ) from e
 
         # Convert each question dict to Question object
@@ -93,8 +90,7 @@ class QuestionsActivities:
         # Get questions for specific date
         if date not in all_questions:
             raise KeyError(
-                f"Date '{date}' not found in questions file. "
-                f"Available dates: {', '.join(sorted(all_questions.keys()))}"
+                f"Date '{date}' not found in questions file. Available dates: {', '.join(sorted(all_questions.keys()))}"
             )
 
         return all_questions[date]

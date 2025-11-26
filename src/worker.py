@@ -11,6 +11,7 @@ from temporalio.worker import Worker
 from src.activities.config import ConfigActivities
 from src.activities.email import EmailActivities
 from src.activities.export import ExportActivities
+from src.activities.leaderboard import LeaderboardActivities
 from src.activities.questions import QuestionsActivities
 from src.activities.time import TimeActivities
 from src.temporal_client import create_temporal_client
@@ -77,6 +78,7 @@ async def main() -> None:
     email_activities = EmailActivities()
     export_activities = ExportActivities()
     time_activities = TimeActivities()
+    leaderboard_activities = LeaderboardActivities()
 
     print("-" * 80)
     print("Registering workflows and activities...")
@@ -92,6 +94,7 @@ async def main() -> None:
     print("  - EmailActivities (1 method)")
     print("  - ExportActivities (1 method)")
     print("  - TimeActivities (1 method)")
+    print("  - LeaderboardActivities (1 method)")
     print("-" * 80)
 
     # Create worker with ALL workflows and activities
@@ -119,6 +122,8 @@ async def main() -> None:
                 export_activities.export_daily_csv_to_s3,
                 # TimeActivities
                 time_activities.create_timezone_aware_datetime,
+                # LeaderboardActivities
+                leaderboard_activities.submit_score_to_daily_workflow,
             ],
             activity_executor=activity_executor,
         )

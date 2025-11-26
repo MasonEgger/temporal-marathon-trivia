@@ -854,9 +854,7 @@ class TestExportActivities:
             assert "marathon-trivia-2025-03-12.csv" in result
 
             # Get CSV from S3
-            response = s3_client.get_object(
-                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-            )
+            response = s3_client.get_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
             csv_content = response["Body"].read().decode("utf-8")
 
             # Verify CSV format (has header and 3 data rows)
@@ -894,9 +892,7 @@ class TestExportActivities:
             )
 
             # Get CSV from S3
-            response = s3_client.get_object(
-                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-            )
+            response = s3_client.get_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
             csv_content = response["Body"].read().decode("utf-8")
 
             # Verify all 3 players are in CSV
@@ -938,9 +934,7 @@ class TestExportActivities:
             )
 
             # Get CSV from S3
-            response = s3_client.get_object(
-                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-            )
+            response = s3_client.get_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
             csv_content = response["Body"].read().decode("utf-8")
 
             # Verify header row has correct columns
@@ -986,9 +980,7 @@ class TestExportActivities:
             )
 
             # Get CSV from S3
-            response = s3_client.get_object(
-                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-            )
+            response = s3_client.get_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
             csv_content = response["Body"].read().decode("utf-8")
 
             # Verify header row has only 2 day columns
@@ -1031,9 +1023,7 @@ class TestExportActivities:
             )
 
             # Verify object exists with correct key
-            response = s3_client.head_object(
-                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-            )
+            response = s3_client.head_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
             assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
 
     def test_export_daily_csv_to_s3_returns_s3_url(self) -> None:
@@ -1067,9 +1057,7 @@ class TestExportActivities:
             )
 
             # Verify S3 URL format
-            expected_url = (
-                "https://test-bucket.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
-            )
+            expected_url = "https://test-bucket.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
             assert result == expected_url
 
     def test_export_daily_csv_to_s3_handles_empty_player_list(self) -> None:
@@ -1104,9 +1092,7 @@ class TestExportActivities:
             assert "marathon-trivia-2025-03-12.csv" in result
 
             # Get CSV from S3
-            response = s3_client.get_object(
-                Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-            )
+            response = s3_client.get_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
             csv_content = response["Body"].read().decode("utf-8")
 
             # Should have header only

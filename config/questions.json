@@ -1,0 +1,116 @@
+{
+  "2025-11-26": [
+    {
+      "id": "q1",
+      "text": "What is Temporal's primary use case?",
+      "options": {
+        "A": "Durable execution of application code",
+        "B": "Database management",
+        "C": "Message queue processing",
+        "D": "Static website hosting"
+      },
+      "correct_answer": "A"
+    },
+    {
+      "id": "q2",
+      "text": "What programming languages does Temporal officially support?",
+      "options": {
+        "A": "Only Go and Java",
+        "B": "Go, Java, TypeScript, Python, .NET, PHP",
+        "C": "Only Python and JavaScript",
+        "D": "Only compiled languages"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "q3",
+      "text": "What is a Temporal Workflow?",
+      "options": {
+        "A": "A database transaction",
+        "B": "A durable function that orchestrates activities",
+        "C": "A REST API endpoint",
+        "D": "A configuration file"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "q4",
+      "text": "What is the purpose of a Temporal Activity?",
+      "options": {
+        "A": "To perform non-deterministic operations like API calls or database queries",
+        "B": "To replace all microservices",
+        "C": "To store configuration data",
+        "D": "To manage user authentication"
+      },
+      "correct_answer": "A"
+    },
+    {
+      "id": "q5",
+      "text": "What happens when a Temporal Worker crashes during workflow execution?",
+      "options": {
+        "A": "The workflow is lost forever",
+        "B": "The workflow must be manually restarted",
+        "C": "Another Worker picks up and continues from last recorded state",
+        "D": "The workflow is cancelled automatically"
+      },
+      "correct_answer": "C"
+    }
+  ],
+    "2025-11-27": [
+    {
+      "id": "q1",
+      "text": "What is Temporal's primary use case?",
+      "options": {
+        "A": "Durable execution of application code",
+        "B": "Database management",
+        "C": "Message queue processing",
+        "D": "Static website hosting"
+      },
+      "correct_answer": "A"
+    },
+    {
+      "id": "q2",
+      "text": "What programming languages does Temporal officially support?",
+      "options": {
+        "A": "Only Go and Java",
+        "B": "Go, Java, TypeScript, Python, .NET, PHP",
+        "C": "Only Python and JavaScript",
+        "D": "Only compiled languages"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "q3",
+      "text": "What is a Temporal Workflow?",
+      "options": {
+        "A": "A database transaction",
+        "B": "A durable function that orchestrates activities",
+        "C": "A REST API endpoint",
+        "D": "A configuration file"
+      },
+      "correct_answer": "B"
+    },
+    {
+      "id": "q4",
+      "text": "What is the purpose of a Temporal Activity?",
+      "options": {
+        "A": "To perform non-deterministic operations like API calls or database queries",
+        "B": "To replace all microservices",
+        "C": "To store configuration data",
+        "D": "To manage user authentication"
+      },
+      "correct_answer": "A"
+    },
+    {
+      "id": "q5",
+      "text": "What happens when a Temporal Worker crashes during workflow execution?",
+      "options": {
+        "A": "The workflow is lost forever",
+        "B": "The workflow must be manually restarted",
+        "C": "Another Worker picks up and continues from last recorded state",
+        "D": "The workflow is cancelled automatically"
+      },
+      "correct_answer": "C"
+    }
+  ]
+}

@@ -91,9 +91,7 @@ class PlayerEntityWorkflow:
             ),
             current_day=self.state.current_day,
             current_question_index=self.state.current_question_index,
-            current_questions=(
-                list(self.state.current_questions) if self.state.current_questions else None
-            ),
+            current_questions=(list(self.state.current_questions) if self.state.current_questions else None),
         )
 
     @workflow.query
@@ -182,7 +180,7 @@ class PlayerEntityWorkflow:
         return questions[0]
 
     @workflow.update
-    def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
+    async def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
         """Update handler to submit an answer and progress through questions.
 
         Validates the answer, updates scores if correct, and returns either the next
@@ -217,9 +215,7 @@ class PlayerEntityWorkflow:
 
         # Validate date matches current_day
         if request.date != self.state.current_day:
-            raise ApplicationError(
-                f"Date {request.date} does not match current day {self.state.current_day}"
-            )
+            raise ApplicationError(f"Date {request.date} does not match current day {self.state.current_day}")
 
         # Validate day not already completed
         if request.date in self.state.player.completed_days:
@@ -227,9 +223,7 @@ class PlayerEntityWorkflow:
 
         # Validate answer_choice is valid
         if request.answer_choice not in ["A", "B", "C", "D"]:
-            raise ApplicationError(
-                f"Invalid answer_choice '{request.answer_choice}' - must be A, B, C, or D"
-            )
+            raise ApplicationError(f"Invalid answer_choice '{request.answer_choice}' - must be A, B, C, or D")
 
         # Get current question
         current_question = self._get_current_question()
@@ -237,8 +231,7 @@ class PlayerEntityWorkflow:
         # Validate question_id matches current question
         if request.question_id != current_question.id:
             raise ApplicationError(
-                f"Question ID {request.question_id} does not match "
-                f"current question {current_question.id}"
+                f"Question ID {request.question_id} does not match current question {current_question.id}"
             )
 
         # Check if answer is correct
@@ -247,9 +240,7 @@ class PlayerEntityWorkflow:
         # Update scores if correct
         if is_correct:
             # Increment daily score
-            self.state.player.daily_scores[request.date] = (
-                self.state.player.daily_scores.get(request.date, 0) + 1
-            )
+            self.state.player.daily_scores[request.date] = self.state.player.daily_scores.get(request.date, 0) + 1
             # Increment total score
             self.state.player.total_score += 1
 
@@ -264,14 +255,10 @@ class PlayerEntityWorkflow:
         if self.state.current_question_index < total_questions:
             # More questions remain - return next question
             # Cast safe: _get_current_question() validates current_questions is not None
-            next_question = cast(list[Question], self.state.current_questions)[
-                self.state.current_question_index
-            ]
+            next_question = cast(list[Question], self.state.current_questions)[self.state.current_question_index]
             return AnswerResult(
                 is_correct=is_correct,
-                correct_answer=(
-                    current_question.correct_answer if request.show_correct_answer else None
-                ),
+                correct_answer=(current_question.correct_answer if request.show_correct_answer else None),
                 next_question=next_question,
                 completion_message=None,
                 current_score=current_score,
@@ -280,12 +267,37 @@ class PlayerEntityWorkflow:
         else:
             # All questions answered - mark day as completed
             self.state.player.completed_days.add(request.date)
+
+            # Submit score to DailyWorkflow for leaderboard aggregation via activity
+            from src.activities.leaderboard import LeaderboardActivities
+            from src.models.answer import SubmitScoreRequest
+
+            # Calculate DailyWorkflow ID using predictable format: {event_id}-day-{date}
+            parent_info = workflow.info().parent
+            event_id = parent_info.workflow_id if parent_info is not None else "marathon-trivia-event"
+            daily_workflow_id = f"{event_id}-day-{request.date}"
+
+            # Call activity to submit score to DailyWorkflow
+            # Activities can use the full Temporal client API to call updates on other workflows
+            await workflow.execute_activity_method(
+                LeaderboardActivities.submit_score_to_daily_workflow,
+                args=[
+                    daily_workflow_id,
+                    SubmitScoreRequest(
+                        player_id=self.state.player.id,
+                        score=current_score,
+                        first_name=self.state.player.first_name,
+                        last_name=self.state.player.last_name,
+                        email=self.state.player.email,
+                    ),
+                ],
+                start_to_close_timeout=timedelta(seconds=10),
+            )
+
             completion_message = f"Day complete! You scored {current_score}/{total_questions}."
             return AnswerResult(
                 is_correct=is_correct,
-                correct_answer=(
-                    current_question.correct_answer if request.show_correct_answer else None
-                ),
+                correct_answer=(current_question.correct_answer if request.show_correct_answer else None),
                 next_question=None,
                 completion_message=completion_message,
                 current_score=current_score,

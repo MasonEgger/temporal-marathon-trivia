@@ -32,9 +32,7 @@ def get_task_queue() -> str:
     return os.getenv("TEMPORAL_TASK_QUEUE", "marathon-trivia")
 
 
-async def start_test_event_workflow(
-    workflow_id: str, config_path: str = "tests/fixtures/config.toml"
-) -> str:
+async def start_test_event_workflow(workflow_id: str, config_path: str = "tests/fixtures/config.toml") -> str:
     """
     Start an EventWorkflow for integration testing.
 
@@ -86,9 +84,7 @@ async def register_test_player(
 
     handle = client.get_workflow_handle(event_workflow_id)
 
-    request = RegisterPlayerRequest(
-        email=email, first_name=first_name, last_name=last_name
-    )
+    request = RegisterPlayerRequest(email=email, first_name=first_name, last_name=last_name)
 
     player_id = await handle.execute_update(EventWorkflow.register_player, request)
 
@@ -166,28 +162,85 @@ async def submit_player_answer(
 async def answer_all_questions(
     player_id: str,
     day_date: str,
-    questions: list[Question],
-    correct_answers: dict[str, str],
-) -> int:
+    questions: list[Question] | None = None,
+    correct_answers: dict[str, str] | None = None,
+    correct_count: int | None = None,
+) -> list[Question]:
     """
     Answer all questions for a day.
 
     Args:
         player_id: Player workflow ID
         day_date: Date string (ISO format: YYYY-MM-DD)
-        questions: List of questions for the day
+        questions: List of questions for the day (if None, will start day to get them)
         correct_answers: Dict mapping question_id to correct answer (A/B/C/D)
+        correct_count: Number of questions to answer correctly (simplified mode)
 
     Returns:
-        Final score for the day
+        List of questions that were answered
 
     Raises:
         Exception: If answering fails
     """
-    score = 0
+    # Simplified mode: answer first N questions correctly
+    if correct_count is not None:
+        # Start the day to get first question
+        first_question = await start_player_day(
+            player_id=player_id,
+            day_date=day_date,
+        )
 
-    for question in questions:
-        correct_answer = correct_answers.get(question.id, "A")
+        all_questions = [first_question]
+        score = 0
+
+        while True:
+            current_question = all_questions[-1]
+
+            # Determine if we should answer correctly
+            should_be_correct = score < correct_count
+            if should_be_correct:
+                answer_choice = current_question.correct_answer
+            else:
+                # Choose a wrong answer
+                answer_choice = "B" if current_question.correct_answer != "B" else "A"
+
+            result = await submit_player_answer(
+                player_id=player_id,
+                date=day_date,
+                question_id=current_question.id,
+                answer_choice=answer_choice,
+                show_correct_answer=True,
+            )
+
+            if result.is_correct:
+                score += 1
+
+            if result.next_question:
+                all_questions.append(result.next_question)
+            else:
+                # Day completed - submit score to DailyWorkflow
+                await submit_score_to_daily_workflow(
+                    event_workflow_id=None,  # Will be fetched from player
+                    player_id=player_id,
+                    day_date=day_date,
+                    score=score,
+                )
+                break
+
+        return all_questions
+
+    # Normal mode with correct_answers dict
+    if questions is None:
+        # Start the day to get first question
+        first_question = await start_player_day(
+            player_id=player_id,
+            day_date=day_date,
+        )
+        questions = [first_question]
+
+    score = 0
+    for i, question in enumerate(questions):
+        correct_answer = correct_answers.get(question.id, "A") if correct_answers else "A"
 
         result = await submit_player_answer(
             player_id=player_id,
@@ -200,7 +253,69 @@ async def answer_all_questions(
         if result.is_correct:
             score += 1
 
-    return score
+        # Get next question from result
+        if result.next_question and i < len(questions) - 1:
+            questions.append(result.next_question)
+
+    return questions
+
+
+async def submit_score_to_daily_workflow(
+    event_workflow_id: str | None,
+    player_id: str,
+    day_date: str,
+    score: int,
+) -> None:
+    """
+    Submit a player's score to the DailyWorkflow.
+
+    Args:
+        event_workflow_id: ID of the EventWorkflow (if None, will query player to get it)
+        player_id: Player workflow ID
+        day_date: Date string (ISO format: YYYY-MM-DD)
+        score: Final score for the day
+
+    Raises:
+        Exception: If submission fails
+    """
+    client = await get_temporal_client()
+
+    # Get player state to retrieve email and name
+    player_handle = client.get_workflow_handle(player_id)
+    player_state = await player_handle.query(PlayerEntityWorkflow.get_current_state)
+
+    # If event_workflow_id not provided, extract from player_id
+    # Player IDs format: {event-id}-player-{initials}-{uuid}
+    if event_workflow_id is None:
+        parts = player_id.split("-player-")
+        if len(parts) >= 1:
+            event_workflow_id = parts[0]
+        else:
+            raise ValueError(f"Could not extract event_workflow_id from player_id: {player_id}")
+
+    # Get daily workflow ID from event workflow
+    event_handle = client.get_workflow_handle(event_workflow_id)
+    event_status = await event_handle.query(EventWorkflow.get_event_status)
+    daily_workflow_id = event_status.daily_workflow_ids.get(day_date)
+
+    if not daily_workflow_id:
+        raise ValueError(f"No DailyWorkflow found for date: {day_date}")
+
+    # Submit score to DailyWorkflow
+    from src.models.answer import SubmitScoreRequest
+
+    request = SubmitScoreRequest(
+        player_id=player_id,
+        score=score,
+        email=player_state.player.email,
+        first_name=player_state.player.first_name,
+        last_name=player_state.player.last_name,
+    )
+
+    daily_handle = client.get_workflow_handle(daily_workflow_id)
+    from src.workflows.daily import DailyWorkflow
+
+    await daily_handle.execute_update(DailyWorkflow.submit_score, request)
 
 
 async def get_player_state(player_id: str):

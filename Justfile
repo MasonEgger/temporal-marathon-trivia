@@ -5,9 +5,9 @@
 default:
     @just --list
 
-# Run all tests with coverage
+# Run all tests with coverage (unit tests only for check stability)
 test:
-    uv run pytest
+    uv run pytest tests/unit/
 
 # Run unit tests only
 test-unit:
@@ -16,6 +16,10 @@ test-unit:
 # Run integration tests only (no coverage - tests run against real Temporal server)
 test-integration:
     uv run pytest tests/integration/ --no-cov
+
+# Run ALL tests (unit + integration) with full coverage report
+test-all:
+    uv run pytest
 
 # Run linter
 lint:

@@ -58,12 +58,13 @@ class TestPlayerRegistration:
                 "last_name": "Doe",
                 "email": "john.doe@company.com",
             },
+            follow_redirects=False,  # Don't follow redirect to avoid landing page
         )
 
-        # Verify endpoint responds (not 404)
-        assert response.status_code == 200
-        # Verify it returns HTML (our template rendering logic)
-        assert "text/html" in response.headers["content-type"]
+        # Verify endpoint responds with redirect (303 See Other)
+        assert response.status_code == 303
+        # Verify redirect location is home page
+        assert response.headers["location"] == "/"
 
     def test_join_sets_player_id_cookie_on_success(self) -> None:
         """Test that successful registration sets player_id cookie.
@@ -89,10 +90,12 @@ class TestPlayerRegistration:
                 "last_name": "Smith",
                 "email": "jane@example.com",
             },
+            follow_redirects=False,  # Don't follow redirect
         )
 
         # Verify OUR cookie logic: name is "player_id", value matches workflow response
-        assert response.status_code == 200
+        # Now returns 303 redirect instead of 200
+        assert response.status_code == 303
         assert "player_id" in response.cookies
         assert response.cookies["player_id"] == "player-abc-123"
 
@@ -236,9 +239,7 @@ class TestGameplayStartDay:
         mock_client = AsyncMock()
         mock_handle = AsyncMock()
         # Simulate workflow rejecting because day hasn't started
-        mock_handle.execute_update = AsyncMock(
-            side_effect=ApplicationError("Day has not started yet")
-        )
+        mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("Day has not started yet"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
 
@@ -266,9 +267,7 @@ class TestGameplayStartDay:
         mock_client = AsyncMock()
         mock_handle = AsyncMock()
         # Simulate workflow rejecting because day has ended
-        mock_handle.execute_update = AsyncMock(
-            side_effect=ApplicationError("Day has already ended")
-        )
+        mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("Day has already ended"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
 
@@ -297,9 +296,7 @@ class TestGameplayStartDay:
         mock_client = AsyncMock()
         mock_handle = AsyncMock()
         # Simulate workflow rejecting because day already completed
-        mock_handle.execute_update = AsyncMock(
-            side_effect=ApplicationError("Day already completed")
-        )
+        mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("Day already completed"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
 
@@ -583,9 +580,7 @@ class TestGameplaySubmitAnswer:
         mock_client = AsyncMock()
         mock_handle = AsyncMock()
         # Simulate workflow rejecting invalid answer
-        mock_handle.execute_update = AsyncMock(
-            side_effect=ApplicationError("answer_choice must be one of A, B, C, D")
-        )
+        mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("answer_choice must be one of A, B, C, D"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
 
@@ -671,7 +666,8 @@ class TestLeaderboardEndpoint:
 
         # Mock Redis - no cached data
         mock_redis = MagicMock()
-        mock_redis.get = MagicMock(return_value=None)
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
 
         # Mock Temporal client
@@ -693,14 +689,14 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=100,
-                    daily_scores={"2025-03-10": 100},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
                 LeaderboardEntry(
                     rank=2,
                     display_name="Bob C.",
                     total_score=80,
-                    daily_scores={"2025-03-10": 80},
+                    daily_scores={},
                     email="bob@example.com",
                 ),
             ]
@@ -739,8 +735,8 @@ class TestLeaderboardEndpoint:
 
         # Mock Redis - no cached data initially
         mock_redis = MagicMock()
-        mock_redis.get = MagicMock(return_value=None)
-        mock_redis.set = MagicMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
 
         # Mock Temporal client
@@ -761,7 +757,7 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=100,
-                    daily_scores={"2025-03-10": 100},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
             ]
@@ -811,7 +807,7 @@ class TestLeaderboardEndpoint:
             ]
         )
         mock_redis = MagicMock()
-        mock_redis.get = MagicMock(return_value=cached_data)
+        mock_redis.get = AsyncMock(return_value=cached_data)
         app.state.redis = mock_redis
 
         # Mock Temporal client - should NOT be called
@@ -842,8 +838,8 @@ class TestLeaderboardEndpoint:
 
         # Mock Redis - no cached data
         mock_redis = MagicMock()
-        mock_redis.get = MagicMock(return_value=None)
-        mock_redis.set = MagicMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
 
         # Mock Temporal client with 2 days
@@ -868,14 +864,14 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=50,
-                    daily_scores={"2025-03-10": 50},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
                 LeaderboardEntry(
                     rank=2,
                     display_name="Bob C.",
                     total_score=40,
-                    daily_scores={"2025-03-10": 40},
+                    daily_scores={},
                     email="bob@example.com",
                 ),
             ]
@@ -889,14 +885,14 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Bob C.",
                     total_score=60,
-                    daily_scores={"2025-03-11": 60},
+                    daily_scores={},
                     email="bob@example.com",
                 ),
                 LeaderboardEntry(
                     rank=2,
                     display_name="Alice B.",
                     total_score=55,
-                    daily_scores={"2025-03-11": 55},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
             ]
@@ -938,8 +934,8 @@ class TestLeaderboardEndpoint:
 
         # Mock Redis - no cached data
         mock_redis = MagicMock()
-        mock_redis.get = MagicMock(return_value=None)
-        mock_redis.set = MagicMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
 
         # Mock Temporal client
@@ -961,21 +957,21 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=100,
-                    daily_scores={"2025-03-10": 100},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
                 LeaderboardEntry(
                     rank=1,
                     display_name="Bob C.",
                     total_score=100,
-                    daily_scores={"2025-03-10": 100},
+                    daily_scores={},
                     email="bob@example.com",
                 ),
                 LeaderboardEntry(
                     rank=3,
                     display_name="Charlie D.",
                     total_score=80,
-                    daily_scores={"2025-03-10": 80},
+                    daily_scores={},
                     email="charlie@example.com",
                 ),
             ]
@@ -1013,8 +1009,8 @@ class TestLeaderboardEndpoint:
 
         # Mock Redis - no cached data
         mock_redis = MagicMock()
-        mock_redis.get = MagicMock(return_value=None)
-        mock_redis.set = MagicMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
 
         # Mock Temporal client
@@ -1039,7 +1035,7 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=50,
-                    daily_scores={"2025-03-10": 50},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
             ]
@@ -1052,7 +1048,7 @@ class TestLeaderboardEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=105,
-                    daily_scores={"2025-03-11": 55},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
             ]
@@ -1106,19 +1102,19 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},  # DailyWorkflow returns empty daily_scores
                 email="alice@example.com",
             ),
             LeaderboardEntry(
                 rank=2,
                 display_name="Bob C.",
                 total_score=80,
-                daily_scores={"2025-03-10": 80},
+                daily_scores={},  # DailyWorkflow returns empty daily_scores
                 email="bob@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1])
+        result = aggregate_leaderboards([("2025-03-10", day1)])
 
         # Verify OUR aggregation preserves single-day data
         assert len(result) == 2
@@ -1141,7 +1137,7 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=50,
-                daily_scores={"2025-03-10": 50},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
@@ -1151,12 +1147,12 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=60,
-                daily_scores={"2025-03-11": 60},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1, day2])
+        result = aggregate_leaderboards([("2025-03-10", day1), ("2025-03-11", day2)])
 
         # Verify OUR merging logic
         assert len(result) == 1
@@ -1178,7 +1174,7 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=50,
-                daily_scores={"2025-03-10": 50},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
@@ -1188,7 +1184,7 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=60,
-                daily_scores={"2025-03-11": 60},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
@@ -1198,12 +1194,12 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=40,
-                daily_scores={"2025-03-12": 40},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1, day2, day3])
+        result = aggregate_leaderboards([("2025-03-10", day1), ("2025-03-11", day2), ("2025-03-12", day3)])
 
         # Verify OUR total score calculation
         assert len(result) == 1
@@ -1223,14 +1219,14 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=50,
-                daily_scores={"2025-03-10": 50},
+                daily_scores={},
                 email="alice@example.com",
             ),
             LeaderboardEntry(
                 rank=2,
                 display_name="Bob C.",
                 total_score=40,
-                daily_scores={"2025-03-10": 40},
+                daily_scores={},
                 email="bob@example.com",
             ),
         ]
@@ -1240,19 +1236,19 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Bob C.",
                 total_score=60,
-                daily_scores={"2025-03-11": 60},
+                daily_scores={},
                 email="bob@example.com",
             ),
             LeaderboardEntry(
                 rank=2,
                 display_name="Alice B.",
                 total_score=55,
-                daily_scores={"2025-03-11": 55},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1, day2])
+        result = aggregate_leaderboards([("2025-03-10", day1), ("2025-03-11", day2)])
 
         # Verify OUR ranking (Alice 105 > Bob 100)
         assert len(result) == 2
@@ -1278,19 +1274,19 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="alice@example.com",
             ),
             LeaderboardEntry(
                 rank=1,
                 display_name="Bob C.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="bob@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1])
+        result = aggregate_leaderboards([("2025-03-10", day1)])
 
         # Verify OUR tie handling (both rank 1)
         assert len(result) == 2
@@ -1315,26 +1311,26 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="alice@example.com",
             ),
             LeaderboardEntry(
                 rank=1,
                 display_name="Bob C.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="bob@example.com",
             ),
             LeaderboardEntry(
                 rank=3,
                 display_name="Charlie D.",
                 total_score=80,
-                daily_scores={"2025-03-10": 80},
+                daily_scores={},
                 email="charlie@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1])
+        result = aggregate_leaderboards([("2025-03-10", day1)])
 
         # Verify OUR rank adjustment logic
         assert len(result) == 3
@@ -1356,26 +1352,26 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Zoe Y.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="zoe@example.com",
             ),
             LeaderboardEntry(
                 rank=1,
                 display_name="Alice B.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="alice@example.com",
             ),
             LeaderboardEntry(
                 rank=1,
                 display_name="Bob C.",
                 total_score=100,
-                daily_scores={"2025-03-10": 100},
+                daily_scores={},
                 email="bob@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1])
+        result = aggregate_leaderboards([("2025-03-10", day1)])
 
         # Verify OUR alphabetical tie-breaking
         assert len(result) == 3
@@ -1414,14 +1410,14 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=50,
-                daily_scores={"2025-03-10": 50},
+                daily_scores={},
                 email="alice@example.com",
             ),
             LeaderboardEntry(
                 rank=2,
                 display_name="Bob C.",
                 total_score=40,
-                daily_scores={"2025-03-10": 40},
+                daily_scores={},
                 email="bob@example.com",
             ),
         ]
@@ -1431,12 +1427,12 @@ class TestAggregateLeaderboards:
                 rank=1,
                 display_name="Alice B.",
                 total_score=60,
-                daily_scores={"2025-03-11": 60},
+                daily_scores={},
                 email="alice@example.com",
             ),
         ]
 
-        result = aggregate_leaderboards([day1, day2])
+        result = aggregate_leaderboards([("2025-03-10", day1), ("2025-03-11", day2)])
 
         # Verify OUR partial participation handling
         assert len(result) == 2
@@ -1616,14 +1612,14 @@ class TestPlayerLookupEndpoint:
                     rank=1,
                     display_name="Alice B.",
                     total_score=100,
-                    daily_scores={"2025-03-10": 100},
+                    daily_scores={},
                     email="alice@example.com",
                 ),
                 LeaderboardEntry(
                     rank=2,
                     display_name="Bob C.",
                     total_score=80,
-                    daily_scores={"2025-03-10": 80},
+                    daily_scores={},
                     email="bob@example.com",
                 ),
             ]

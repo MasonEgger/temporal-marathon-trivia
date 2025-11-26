@@ -152,9 +152,9 @@ class EventWorkflow:
             start_to_close_timeout=timedelta(seconds=10),
         )
 
-        # Generate workflow ID for this daily workflow (e.g., "test-parent-day1")
+        # Generate workflow ID for this daily workflow (e.g., "marathon-trivia-event-day-2025-11-26")
         date_str = event_date.isoformat()
-        daily_workflow_id = f"{self.state.event_id}-day{day_num}"
+        daily_workflow_id = f"{self.state.event_id}-day-{date_str}"
 
         # Start DailyWorkflow as child workflow
         await workflow.start_child_workflow(

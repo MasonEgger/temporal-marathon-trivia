@@ -2,12 +2,14 @@
 # Handles player registration and state queries.
 
 import json
+import os
 
 from fastapi import APIRouter, Cookie, Form, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from temporalio.exceptions import ApplicationError
 
+from src.api.player_verification import verify_player_workflow
 from src.api.routes.leaderboard import aggregate_leaderboards
 from src.models.answer import EventStatusResponse, RegisterPlayerRequest
 from src.workflows.daily import DailyWorkflow
@@ -48,8 +50,7 @@ async def join(
         temporal_client = app.state.temporal_client
 
         # Get EventWorkflow handle (assumes workflow is already running)
-        # TODO: Get event_id from config or environment
-        event_id = "default-event"
+        event_id = os.getenv("EVENT_WORKFLOW_ID", "default-event")
         handle = temporal_client.get_workflow_handle(event_id)
 
         # Call register_player update handler
@@ -63,10 +64,8 @@ async def join(
             register_request,
         )
 
-        # Render success template
-        response = templates.TemplateResponse(
-            request, "components/join-success.html", {"player_id": player_id}
-        )
+        # Redirect to home page (which will show game interface now that user is registered)
+        response = RedirectResponse(url="/", status_code=303)
 
         # Set player_id cookie
         response.set_cookie(key="player_id", value=player_id)
@@ -76,14 +75,10 @@ async def join(
     except ApplicationError as e:
         # Validation error from workflow (email, work domain, etc.)
         error_message = str(e)
-        return templates.TemplateResponse(
-            request, "components/error.html", {"error": error_message}
-        )
+        return templates.TemplateResponse(request, "components/error.html", {"error": error_message})
     except Exception as e:
         # Unexpected error
-        return templates.TemplateResponse(
-            request, "components/error.html", {"error": f"An error occurred: {e}"}
-        )
+        return templates.TemplateResponse(request, "components/error.html", {"error": f"An error occurred: {e}"})
 
 
 @router.get("/api/player", response_class=HTMLResponse)
@@ -109,16 +104,25 @@ async def get_player(
     """
     # Manual cookie validation for HTMX pattern
     if not player_id:
-        return templates.TemplateResponse(
-            request, "components/error.html", {"error": "Please register first"}
-        )
+        return templates.TemplateResponse(request, "components/error.html", {"error": "Please register first"})
 
     try:
         temporal_client = request.app.state.temporal_client
         redis = request.app.state.redis
 
+        # Verify PlayerEntityWorkflow exists (handles server restarts gracefully)
+        player_handle = await verify_player_workflow(player_id, temporal_client)
+        if player_handle is None:
+            # Workflow doesn't exist - clear cookie and show error
+            response = templates.TemplateResponse(
+                request,
+                "components/error.html",
+                {"error": "Session expired. Please register again."},
+            )
+            response.delete_cookie(key="player_id")
+            return response
+
         # Get player's email from PlayerEntityWorkflow
-        player_handle = temporal_client.get_workflow_handle(player_id)
         player_state = await player_handle.query(PlayerEntityWorkflow.get_current_state)
         player_email = player_state.player.email
 
@@ -137,16 +141,14 @@ async def get_player(
 
             event_id = os.getenv("EVENT_WORKFLOW_ID", "marathon-trivia-event")
             event_handle = temporal_client.get_workflow_handle(event_id)
-            event_status: EventStatusResponse = await event_handle.query(
-                EventWorkflow.get_event_status
-            )
+            event_status: EventStatusResponse = await event_handle.query(EventWorkflow.get_event_status)
 
             # Query each DailyWorkflow
             daily_leaderboards = []
-            for daily_workflow_id in event_status.daily_workflow_ids.values():
+            for date_str, daily_workflow_id in event_status.daily_workflow_ids.items():
                 daily_handle = temporal_client.get_workflow_handle(daily_workflow_id)
                 daily_leaderboard = await daily_handle.query(DailyWorkflow.get_daily_leaderboard)
-                daily_leaderboards.append(daily_leaderboard)
+                daily_leaderboards.append((date_str, daily_leaderboard))
 
             # Aggregate
             leaderboard_entries = aggregate_leaderboards(daily_leaderboards)

@@ -52,9 +52,7 @@ async def test_player_can_join_answer_questions_and_see_leaderboard() -> None:
         await asyncio.sleep(0.5)
 
         # Start day 1
-        first_question = await start_player_day(
-            player_id=player_id, day_date="2025-03-10"
-        )
+        first_question = await start_player_day(player_id=player_id, day_date="2025-03-10")
 
         assert first_question is not None
         assert first_question.id == "day1_q1"
@@ -147,9 +145,7 @@ async def test_player_can_play_multiple_days() -> None:
         await asyncio.sleep(0.5)
 
         # === DAY 1: Answer all questions correctly ===
-        first_question_day1 = await start_player_day(
-            player_id=player_id, day_date="2025-03-10"
-        )
+        first_question_day1 = await start_player_day(player_id=player_id, day_date="2025-03-10")
 
         assert first_question_day1.id == "day1_q1"
 
@@ -178,9 +174,7 @@ async def test_player_can_play_multiple_days() -> None:
         assert "2025-03-10" in state_after_day1.player.completed_days
 
         # === DAY 2: Answer some questions incorrectly ===
-        first_question_day2 = await start_player_day(
-            player_id=player_id, day_date="2025-03-11"
-        )
+        first_question_day2 = await start_player_day(player_id=player_id, day_date="2025-03-11")
 
         assert first_question_day2.id == "day2_q1"
 

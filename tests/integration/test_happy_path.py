@@ -61,9 +61,7 @@ async def test_happy_path_single_player_single_day() -> None:
 
     # Start day 1
     print("\n=== Starting Day 1 (2025-03-10) ===")
-    first_question = await start_player_day(
-        player_id=player_id, day_date="2025-03-10"
-    )
+    first_question = await start_player_day(player_id=player_id, day_date="2025-03-10")
     print(f"First question: {first_question.id} - {first_question.text}")
 
     # Answer all 5 questions correctly

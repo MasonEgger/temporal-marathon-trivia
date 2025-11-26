@@ -77,9 +77,7 @@ class TestPlayerEntityWorkflow:
     """Test suite for PlayerEntityWorkflow - basic structure and state management."""
 
     @pytest.mark.asyncio
-    async def test_workflow_can_be_started_with_player_info(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_workflow_can_be_started_with_player_info(self, client: Client, worker: Worker) -> None:
         """Test that PlayerEntityWorkflow can be started with player information."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -95,9 +93,7 @@ class TestPlayerEntityWorkflow:
         assert handle is not None
 
     @pytest.mark.asyncio
-    async def test_workflow_initializes_with_correct_player_state(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_workflow_initializes_with_correct_player_state(self, client: Client, worker: Worker) -> None:
         """Test that PlayerEntityWorkflow initializes with zero scores and empty completed days."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -122,9 +118,7 @@ class TestPlayerEntityWorkflow:
         assert state.current_question_index == 0
 
     @pytest.mark.asyncio
-    async def test_query_get_current_state_returns_player_state(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_query_get_current_state_returns_player_state(self, client: Client, worker: Worker) -> None:
         """Test that get_current_state query returns PlayerState."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -141,9 +135,7 @@ class TestPlayerEntityWorkflow:
         assert isinstance(state, PlayerState)
 
     @pytest.mark.asyncio
-    async def test_query_get_score_for_day_returns_zero_initially(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_query_get_score_for_day_returns_zero_initially(self, client: Client, worker: Worker) -> None:
         """Test that get_score_for_day query returns 0 for unplayed days."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -160,9 +152,7 @@ class TestPlayerEntityWorkflow:
         assert score == 0
 
     @pytest.mark.asyncio
-    async def test_query_has_completed_day_returns_false_initially(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_query_has_completed_day_returns_false_initially(self, client: Client, worker: Worker) -> None:
         """Test that has_completed_day query returns False for unplayed days."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -204,9 +194,7 @@ class TestPlayerEntityWorkflowStartDay:
         assert result.text == "What is 2+2?"
 
     @pytest.mark.asyncio
-    async def test_start_day_sets_current_day_in_state(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_start_day_sets_current_day_in_state(self, client: Client, worker: Worker) -> None:
         """Test that start_day sets current_day in workflow state."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -226,9 +214,7 @@ class TestPlayerEntityWorkflowStartDay:
         assert state.current_day == "2025-03-10"
 
     @pytest.mark.asyncio
-    async def test_start_day_sets_current_question_index_to_zero(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_start_day_sets_current_question_index_to_zero(self, client: Client, worker: Worker) -> None:
         """Test that start_day sets current_question_index to 0."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -248,9 +234,7 @@ class TestPlayerEntityWorkflowStartDay:
         assert state.current_question_index == 0
 
     @pytest.mark.asyncio
-    async def test_start_day_raises_error_if_day_already_completed(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_start_day_raises_error_if_day_already_completed(self, client: Client, worker: Worker) -> None:
         """Test that start_day raises error if day is already completed."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -283,9 +267,7 @@ class TestPlayerEntityWorkflowStartDay:
         assert "already completed" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
-    async def test_start_day_calls_get_questions_for_day_activity(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_start_day_calls_get_questions_for_day_activity(self, client: Client, worker: Worker) -> None:
         """Test that start_day calls the get_questions_for_day activity."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -304,9 +286,7 @@ class TestPlayerEntityWorkflowStartDay:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_start_day_returns_question_with_correct_structure(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_start_day_returns_question_with_correct_structure(self, client: Client, worker: Worker) -> None:
         """Test that start_day returns a Question object with proper structure."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -335,9 +315,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
     """Test suite for PlayerEntityWorkflow submit_answer update handler."""
 
     @pytest.mark.asyncio
-    async def test_submit_answer_with_correct_answer_increments_score(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_submit_answer_with_correct_answer_increments_score(self, client: Client, worker: Worker) -> None:
         """Test that submit_answer with correct answer increments daily and total score."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -407,9 +385,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         assert state.player.total_score == 0
 
     @pytest.mark.asyncio
-    async def test_submit_answer_returns_next_question_if_more_remain(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_submit_answer_returns_next_question_if_more_remain(self, client: Client, worker: Worker) -> None:
         """Test that submit_answer returns next question if more questions remain."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -478,9 +454,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         assert isinstance(result.completion_message, str)
 
     @pytest.mark.asyncio
-    async def test_submit_answer_validates_answer_choice_is_valid(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_submit_answer_validates_answer_choice_is_valid(self, client: Client, worker: Worker) -> None:
         """Test that submit_answer validates answer_choice is one of A, B, C, D."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -530,9 +504,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         assert "question" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
-    async def test_submit_answer_raises_error_if_day_not_started(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_submit_answer_raises_error_if_day_not_started(self, client: Client, worker: Worker) -> None:
         """Test that submit_answer raises ValueError if day hasn't been started yet."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -553,9 +525,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         assert "not started" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
-    async def test_submit_answer_raises_error_if_day_already_completed(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_submit_answer_raises_error_if_day_already_completed(self, client: Client, worker: Worker) -> None:
         """Test that submit_answer raises ValueError if day is already completed."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -625,9 +595,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
         assert "2025-03-10" in state.player.completed_days
 
     @pytest.mark.asyncio
-    async def test_submit_answer_updates_total_score_correctly(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_submit_answer_updates_total_score_correctly(self, client: Client, worker: Worker) -> None:
         """Test that submit_answer updates total_score correctly across questions."""
         handle = await client.start_workflow(
             PlayerEntityWorkflow.run,
@@ -671,9 +639,7 @@ class TestDailyWorkflow:
     """Test suite for DailyWorkflow initialization and basic state management."""
 
     @pytest.mark.asyncio
-    async def test_daily_workflow_can_be_started_with_date_and_questions(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_daily_workflow_can_be_started_with_date_and_questions(self, client: Client, worker: Worker) -> None:
         """Test that DailyWorkflow can be started with date and questions."""
         config = create_test_event_config()
         questions = create_test_questions()
@@ -692,9 +658,7 @@ class TestDailyWorkflow:
         assert handle is not None
 
     @pytest.mark.asyncio
-    async def test_daily_workflow_initializes_with_empty_player_scores(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_daily_workflow_initializes_with_empty_player_scores(self, client: Client, worker: Worker) -> None:
         """Test that workflow initializes with empty player_scores."""
         config = create_test_event_config()
         questions = create_test_questions()
@@ -737,9 +701,7 @@ class TestDailyWorkflow:
         assert leaderboard == []
 
     @pytest.mark.asyncio
-    async def test_get_daily_leaderboard_returns_empty_list_initially(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_get_daily_leaderboard_returns_empty_list_initially(self, client: Client, worker: Worker) -> None:
         """Test that get_daily_leaderboard query returns empty list initially."""
         config = create_test_event_config()
         questions = create_test_questions()
@@ -760,9 +722,7 @@ class TestDailyWorkflow:
         assert len(leaderboard) == 0
 
     @pytest.mark.asyncio
-    async def test_is_day_active_respects_day_start_time(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_is_day_active_respects_day_start_time(self, client: Client, worker: Worker) -> None:
         """Test that is_day_active query respects day_start_time."""
         config = create_test_event_config()  # day_start_time = 09:00
         questions = create_test_questions()
@@ -783,9 +743,7 @@ class TestDailyWorkflow:
         assert isinstance(is_active, bool)
 
     @pytest.mark.asyncio
-    async def test_is_day_active_respects_day_end_time(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_is_day_active_respects_day_end_time(self, client: Client, worker: Worker) -> None:
         """Test that is_day_active query respects day_end_time."""
         config = create_test_event_config()  # day_end_time = 17:00
         questions = create_test_questions()
@@ -934,9 +892,7 @@ class TestDailyWorkflow:
         assert leaderboard[5].rank == 6
 
     @pytest.mark.asyncio
-    async def test_get_daily_leaderboard_ties_broken_alphabetically(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_get_daily_leaderboard_ties_broken_alphabetically(self, client: Client, worker: Worker) -> None:
         """Test that ties are broken alphabetically by last name, then first name."""
         config = create_test_event_config()
         questions = create_test_questions()
@@ -1029,9 +985,7 @@ class TestEventWorkflow:
         assert handle is not None
 
     @pytest.mark.asyncio
-    async def test_event_workflow_loads_configuration_via_activity(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_event_workflow_loads_configuration_via_activity(self, client: Client, worker: Worker) -> None:
         """Test that workflow loads configuration via load_event_config activity."""
         handle = await client.start_workflow(
             EventWorkflow.run,
@@ -1052,9 +1006,7 @@ class TestEventWorkflow:
         assert status.event_id == "test-event-123"
 
     @pytest.mark.asyncio
-    async def test_event_workflow_validates_questions_file_via_activity(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_event_workflow_validates_questions_file_via_activity(self, client: Client, worker: Worker) -> None:
         """Test that workflow validates questions file via validate_questions_file activity."""
         # Start workflow - should call validate_questions_file activity
         handle = await client.start_workflow(
@@ -1114,9 +1066,7 @@ class TestEventWorkflow:
         assert status.player_count == 0
 
     @pytest.mark.asyncio
-    async def test_register_player_creates_new_player_entity_workflow(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_register_player_creates_new_player_entity_workflow(self, client: Client, worker: Worker) -> None:
         """Test that register_player() creates new PlayerEntityWorkflow."""
         handle = await client.start_workflow(
             EventWorkflow.run,
@@ -1181,9 +1131,7 @@ class TestEventWorkflow:
         assert len(player_id) > 0
 
     @pytest.mark.asyncio
-    async def test_register_player_increments_player_count(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_register_player_increments_player_count(self, client: Client, worker: Worker) -> None:
         """Test that register_player() increments player_count."""
         handle = await client.start_workflow(
             EventWorkflow.run,
@@ -1228,9 +1176,7 @@ class TestEventWorkflow:
         assert status.player_count == 2
 
     @pytest.mark.asyncio
-    async def test_register_player_stores_email_to_player_id_mapping(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_register_player_stores_email_to_player_id_mapping(self, client: Client, worker: Worker) -> None:
         """Test that register_player() stores email -> player_id mapping."""
         handle = await client.start_workflow(
             EventWorkflow.run,
@@ -1346,10 +1292,7 @@ class TestEventWorkflow:
             )
 
         # Verify error message mentions email validation
-        assert (
-            "email" in str(exc_info.value.cause).lower()
-            or "invalid" in str(exc_info.value.cause).lower()
-        )
+        assert "email" in str(exc_info.value.cause).lower() or "invalid" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
     async def test_event_workflow_schedules_daily_workflow_for_each_event_day(
@@ -1386,9 +1329,7 @@ class TestEventWorkflow:
         assert "2025-03-12" in status.daily_workflow_ids
 
     @pytest.mark.asyncio
-    async def test_daily_workflow_starts_at_day_start_time(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_daily_workflow_starts_at_day_start_time(self, client: Client, worker: Worker) -> None:
         """Test that DailyWorkflow is scheduled to start at day_start_time."""
         # Start EventWorkflow
         handle = await client.start_workflow(
@@ -1418,9 +1359,7 @@ class TestEventWorkflow:
         assert isinstance(daily_leaderboard, list)
 
     @pytest.mark.asyncio
-    async def test_workflow_tracks_daily_workflow_ids_correctly(
-        self, client: Client, worker: Worker
-    ) -> None:
+    async def test_workflow_tracks_daily_workflow_ids_correctly(self, client: Client, worker: Worker) -> None:
         """Test that workflow tracks daily_workflow_ids correctly."""
         # Start EventWorkflow
         handle = await client.start_workflow(
@@ -1439,10 +1378,10 @@ class TestEventWorkflow:
         # Query to get daily_workflow_ids
         status = await handle.query(EventWorkflow.get_event_status)
 
-        # Verify workflow IDs follow the pattern "{event_id}-day{num}"
-        assert status.daily_workflow_ids["2025-03-10"] == "test-event-123-day1"
-        assert status.daily_workflow_ids["2025-03-11"] == "test-event-123-day2"
-        assert status.daily_workflow_ids["2025-03-12"] == "test-event-123-day3"
+        # Verify workflow IDs follow the pattern "{event_id}-day-{date}"
+        assert status.daily_workflow_ids["2025-03-10"] == "test-event-123-day-2025-03-10"
+        assert status.daily_workflow_ids["2025-03-11"] == "test-event-123-day-2025-03-11"
+        assert status.daily_workflow_ids["2025-03-12"] == "test-event-123-day-2025-03-12"
 
     @pytest.mark.asyncio
     async def test_workflow_passes_correct_questions_to_each_daily_workflow(
