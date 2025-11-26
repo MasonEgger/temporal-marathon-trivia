@@ -11,7 +11,26 @@
     <!-- HTMX for dynamic HTML updates -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
-    <!-- Custom CSS Variables from Config -->
+    <!-- Tailwind CSS Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '{{ config.primary_color }}',
+                        secondary: '{{ config.secondary_color }}',
+                        background: '{{ config.background_color }}',
+                        textColor: '{{ config.text_color }}'
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom CSS Variables and Styles -->
     <style>
         :root {
             --color-primary: {{ config.primary_color }};
@@ -23,46 +42,111 @@
         body {
             background-color: var(--color-background);
             color: var(--color-text);
+            font-size: 18px; /* Larger base font for readability */
+            line-height: 1.6;
         }
 
+        /* Primary button styling */
         .btn-primary {
             background-color: var(--color-primary);
             color: white;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:focus {
+            outline: 3px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        /* Secondary button styling */
         .btn-secondary {
             background-color: var(--color-secondary);
             color: white;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .btn-secondary:hover {
+        .btn-secondary:hover:not(:disabled) {
             opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-secondary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-secondary:focus {
+            outline: 3px solid var(--color-secondary);
+            outline-offset: 2px;
+        }
+
+        /* Focus visible for keyboard navigation */
+        *:focus-visible {
+            outline: 3px solid var(--color-primary);
+            outline-offset: 2px;
         }
 
         /* High contrast mode for accessibility and booth displays */
         @media (prefers-contrast: high) {
             body {
-                border: 2px solid var(--color-text);
+                border: 3px solid var(--color-text);
             }
+
+            .btn-primary, .btn-secondary {
+                border: 2px solid white;
+            }
+        }
+
+        /* Smooth transitions for all interactive elements */
+        button, a, input, select {
+            transition: all 0.2s ease-in-out;
+        }
+
+        /* Loading state animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+            animation: pulse 1.5s ease-in-out infinite;
         }
     </style>
 
     <!-- Additional page-specific styles -->
     {% block extra_head %}{% endblock %}
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen flex flex-col antialiased">
     <!-- Main content area -->
-    <div id="main" class="container mx-auto px-4 py-8">
-        {% block content %}{% endblock %}
-    </div>
+    <main class="flex-1">
+        <div id="main" class="container mx-auto px-4 py-6 md:py-10 max-w-7xl">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
 
     <!-- Footer -->
-    <footer class="text-center py-4 text-sm opacity-75">
-        <p>Powered by Temporal Workflows</p>
+    <footer class="text-center py-6 text-sm border-t border-gray-200 bg-gray-50">
+        <p class="text-gray-600">
+            <span class="font-semibold">Powered by</span>
+            <a href="https://temporal.io" target="_blank" class="text-blue-600 hover:text-blue-700 hover:underline ml-1">
+                Temporal Workflows
+            </a>
+        </p>
     </footer>
 
     <!-- Additional page-specific scripts -->

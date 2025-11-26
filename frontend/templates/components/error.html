@@ -1,5 +1,33 @@
-<div class="error-message">
-    <h2>Error</h2>
-    <p>{{ error }}</p>
-    <a href="/">Back to Home</a>
+<!-- Error message template for HTMX -->
+<div class="error-container max-w-2xl mx-auto">
+    <!-- Error Card -->
+    <div class="bg-white shadow-2xl rounded-3xl p-8 md:p-12 border-2 border-red-200 text-center">
+        <!-- Error icon and heading -->
+        <div class="mb-8">
+            <div class="text-8xl mb-4">⚠️</div>
+            <h2 class="text-3xl md:text-5xl font-extrabold text-red-600 mb-2">
+                Oops!
+            </h2>
+            <p class="text-xl md:text-2xl text-gray-600 font-medium">
+                Something went wrong
+            </p>
+        </div>
+
+        <!-- Error message -->
+        <div class="error-message mb-8 p-6 bg-red-50 rounded-2xl border-2 border-red-200">
+            <p class="text-lg md:text-2xl text-gray-800 font-semibold leading-relaxed">
+                {{ error }}
+            </p>
+        </div>
+
+        <!-- Action button -->
+        <div class="actions">
+            <a
+                href="/"
+                class="btn-primary py-4 px-8 rounded-xl font-bold text-xl shadow-lg hover:shadow-xl transition-all inline-block"
+            >
+                🏠 Back to Home
+            </a>
+        </div>
+    </div>
 </div>

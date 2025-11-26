@@ -4,19 +4,22 @@
 <!-- Determine button state -->
 {% if date_str in player_completed_days %}
     {% set button_state = "completed" %}
-    {% set button_class = "bg-green-500 text-white cursor-default" %}
+    {% set button_class = "bg-gradient-to-br from-green-500 to-green-600 text-white cursor-default border-4 border-green-400 shadow-xl" %}
     {% set button_disabled = true %}
     {% set button_text = "✓ Completed" %}
+    {% set button_icon = "✅" %}
 {% elif date == current_date %}
     {% set button_state = "active" %}
-    {% set button_class = "btn-primary text-white cursor-pointer hover:opacity-90" %}
+    {% set button_class = "btn-primary text-white cursor-pointer hover:scale-105 border-4 border-blue-300 shadow-xl" %}
     {% set button_disabled = false %}
     {% set button_text = "Play Now" %}
+    {% set button_icon = "🎮" %}
 {% else %}
     {% set button_state = "inactive" %}
-    {% set button_class = "bg-gray-300 text-gray-500 cursor-not-allowed" %}
+    {% set button_class = "bg-gray-200 text-gray-500 cursor-not-allowed border-2 border-gray-300 opacity-60" %}
     {% set button_disabled = true %}
     {% set button_text = "Not Available" %}
+    {% set button_icon = "🔒" %}
 {% endif %}
 
 <div class="day-button-container">
@@ -26,11 +29,13 @@
             hx-target="#main"
             hx-swap="innerHTML"
         {% endif %}
-        class="w-full {{ button_class }} py-4 px-6 rounded-lg font-semibold text-center transition shadow-md"
+        class="w-full {{ button_class }} py-6 px-4 rounded-2xl font-bold text-center transition-all duration-300 transform"
         {% if button_disabled %}disabled{% endif %}
+        aria-label="Day {{ day_num }} - {{ button_text }}"
     >
-        <div class="text-sm font-bold mb-1">Day {{ day_num }}</div>
-        <div class="text-xs">{{ date.strftime('%b %d') }}</div>
-        <div class="text-sm mt-2">{{ button_text }}</div>
+        <div class="text-2xl mb-2">{{ button_icon }}</div>
+        <div class="text-lg md:text-xl font-extrabold mb-2">Day {{ day_num }}</div>
+        <div class="text-sm md:text-base opacity-90 mb-1">{{ date.strftime('%b %d') }}</div>
+        <div class="text-base md:text-lg font-bold mt-2">{{ button_text }}</div>
     </button>
 </div>
