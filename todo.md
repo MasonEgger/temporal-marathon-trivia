@@ -161,12 +161,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 18: API Routes - Player Registration
-- [ ] Write player registration endpoint tests
-- [ ] Implement POST /api/join endpoint
-- [ ] Create HTML templates (join-success.html, error.html)
-- [ ] Update main.py to include player router
-- [ ] Refactor with template rendering utility
-- [ ] Verify tests pass and run just check
+- [x] Write player registration endpoint tests (4 focused unit tests)
+- [x] Implement POST /api/join endpoint
+- [x] Create HTML templates (join-success.html, error.html)
+- [x] Update main.py to include player router
+- [x] Refactor with template rendering utility (SKIPPED - not needed)
+- [x] Verify tests pass and run just check
 
 ### Step 19: API Routes - Gameplay Start Day
 - [ ] Write start day endpoint tests
@@ -330,11 +330,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 8/8 steps complete (100%) ✅
-**Phase 4: API Layer** - 1/6 steps complete (16.7%)
+**Phase 4: API Layer** - 2/6 steps complete (33.3%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 17/35 steps complete (48.6%)**
+**Total Progress: 18/35 steps complete (51.4%)**
 
 ---
 

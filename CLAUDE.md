@@ -345,11 +345,11 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 4 in progress - 17/35 steps complete (48.6% total progress)
+**Current Status**: Phase 4 in progress - 18/35 steps complete (51.4% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
-- Phase 4 (API Layer): 16.7% complete (1/6 steps)
+- Phase 4 (API Layer): 33.3% complete (2/6 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -876,12 +876,66 @@ Before writing a workflow test:
 - **Direct Redis Usage**: No wrapper layer - use Redis directly via `app.state.redis.get()`, `app.state.redis.set()`
 - **Health Endpoint**: `GET /health` returns `{"status": "ok"}`
 - **Testing**: 1 test for health endpoint (application logic only, not infrastructure)
-- **Coverage**: 63.16% (19 statements, 7 missed - lifespan infrastructure not tested)
+- **Coverage**: 66.67% (21 statements, 7 missed - lifespan infrastructure not tested)
 - **Design Decision**: Skipped RedisCache wrapper class - unnecessary abstraction with zero application logic
+
+### Player Registration Routes (`src/api/routes/player.py`)
+- **Status**: COMPLETE - Player registration endpoint (Step 18) ✅
+- **Endpoint**: `POST /api/join` - Accepts form data (first_name, last_name, email)
+- **Pattern**: Calls EventWorkflow.register_player via Temporal client
+- **Response**: HTML fragments for HTMX (join-success.html, error.html)
+- **Session Management**: Sets `player_id` cookie for tracking
+- **Error Handling**:
+  - ApplicationError for workflow validation failures (email domain, duplicates)
+  - Generic Exception for unexpected errors (network, timeout)
+- **Templates**:
+  - `frontend/templates/components/join-success.html` - Success message
+  - `frontend/templates/components/error.html` - Error display with dynamic message
+- **Testing**: 4 unit tests focusing on application logic:
+  - Endpoint accepts form parameters
+  - Cookie is set correctly
+  - ApplicationError handling
+  - Unexpected exception handling
+- **Coverage**: 100% (24 statements, 0 missed)
+- **Design Pattern**: Unit tests mock Temporal to test OUR orchestration logic only
 
 ### Testing Philosophy for API Layer 🔑 **CRITICAL**
 
-From Step 17 implementation - key lessons learned:
+From Steps 17-18 implementation - key lessons learned:
+
+**Unit Tests vs Integration Tests - Critical Distinction:**
+- **Unit Tests** (`tests/unit/test_api.py`): Test YOUR application logic in isolation
+  - Endpoint configuration (form parameter names)
+  - Cookie naming and value assignment (session management)
+  - Error handling and template selection (routing decisions)
+  - Exception fallback behavior (error recovery)
+  - Mock Temporal client to isolate endpoint logic
+- **Integration Tests** (`tests/integration/` - future): Test component interaction
+  - Real Temporal workflow execution
+  - Full request/response cycles
+  - End-to-end player registration flow
+  - Actual database/Redis operations
+
+**Pattern for Unit Testing API Endpoints:**
+```python
+# Mock app.state manually before creating TestClient
+from src.api.main import app
+
+mock_client = AsyncMock()
+mock_handle = AsyncMock()
+mock_handle.execute_update = AsyncMock(return_value="player-123")
+mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+app.state.temporal_client = mock_client
+
+client = TestClient(app)
+response = client.post("/api/join", data={...})
+
+# Test OUR application logic
+assert "player_id" in response.cookies  # OUR cookie naming
+assert response.cookies["player_id"] == "player-123"  # OUR value assignment
+```
+
+**From Step 17:**
 
 **DO NOT create wrapper classes without application logic:**
 ```python

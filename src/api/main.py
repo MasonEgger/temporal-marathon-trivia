@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from redis.asyncio import from_url
 from temporalio.client import Client
 
+from src.api.routes import player
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -51,6 +53,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Include routers
+app.include_router(player.router)
 
 
 @app.get("/health")
