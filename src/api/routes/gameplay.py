@@ -70,11 +70,15 @@ async def start_day(
             response.delete_cookie(key="player_id")
             return response
 
-        # Call start_day update handler to get first question
+        # Call start_day update handler to get current question (first if new, current if resuming)
         question = await handle.execute_update(
             PlayerEntityWorkflow.start_day,
             date,
         )
+
+        # Get player state to determine actual question number (for resume functionality)
+        player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
+        question_number = player_state.current_question_index + 1  # Convert 0-based to 1-based
 
         # Render question template with question data
         return templates.TemplateResponse(
@@ -84,7 +88,7 @@ async def start_day(
                 "request": request,
                 "question": question,
                 "date": date,
-                "question_number": 1,
+                "question_number": question_number,
                 # Total questions not available yet - will be added later
             },
         )

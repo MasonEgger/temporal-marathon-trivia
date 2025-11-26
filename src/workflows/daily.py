@@ -4,6 +4,13 @@
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    # Pre-import pydantic dependencies to avoid sandbox warnings
+    import annotated_types  # noqa: F401
+    import email_validator  # noqa: F401
+    import idna  # noqa: F401
+    import idna.uts46data  # noqa: F401
+    import pydantic_core  # noqa: F401
+
     from src.models.answer import SubmitScoreRequest
     from src.models.config import EventConfig
     from src.models.leaderboard import LeaderboardEntry

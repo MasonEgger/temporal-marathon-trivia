@@ -108,7 +108,7 @@ async def landing_page(
         context["event_dates"] = event_dates
         context["current_date"] = date.today()
 
-        # Get player's completed days
+        # Get player's completed days and current in-progress day
         try:
             from src.workflows.player import PlayerEntityWorkflow
 
@@ -116,9 +116,11 @@ async def landing_page(
             handle = request.app.state.temporal_client.get_workflow_handle(workflow_id)
             player_state = await handle.query(PlayerEntityWorkflow.get_current_state)
             context["player_completed_days"] = player_state.player.completed_days
+            context["player_current_day"] = player_state.current_day  # For showing "Resume" button
         except Exception:
-            # If we can't get player state, show empty completed days
+            # If we can't get player state, show empty completed days and no current day
             context["player_completed_days"] = set()
+            context["player_current_day"] = None
 
     return templates.TemplateResponse(request, "landing.html", context)
 

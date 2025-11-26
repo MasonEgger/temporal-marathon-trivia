@@ -1,4 +1,4 @@
-<!-- Day Button Component - Displays state: active, completed, or inactive -->
+<!-- Day Button Component - Displays state: completed, in-progress (resume), active, or inactive -->
 <!-- Note: day_num and date_str must be set by parent template before including -->
 
 <!-- Determine button state -->
@@ -8,6 +8,13 @@
     {% set button_disabled = true %}
     {% set button_text = "✓ Completed" %}
     {% set button_icon = "✅" %}
+{% elif date_str == player_current_day %}
+    {# In-progress day - player can resume from where they left off #}
+    {% set button_state = "in-progress" %}
+    {% set button_class = "bg-gradient-to-br from-yellow-500 to-orange-500 text-white cursor-pointer hover:scale-105 border-4 border-yellow-300 shadow-xl animate-pulse" %}
+    {% set button_disabled = false %}
+    {% set button_text = "▶ Resume" %}
+    {% set button_icon = "🔄" %}
 {% elif date == current_date %}
     {% set button_state = "active" %}
     {% set button_class = "btn-primary text-white cursor-pointer hover:scale-105 border-4 border-blue-300 shadow-xl" %}

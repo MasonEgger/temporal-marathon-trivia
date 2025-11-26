@@ -8,6 +8,13 @@ from temporalio import workflow
 from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
+    # Pre-import pydantic dependencies to avoid sandbox warnings
+    import annotated_types  # noqa: F401
+    import email_validator  # noqa: F401
+    import idna  # noqa: F401
+    import idna.uts46data  # noqa: F401
+    import pydantic_core  # noqa: F401
+
     from src.activities.config import ConfigActivities
     from src.activities.email import EmailActivities
     from src.activities.questions import QuestionsActivities
@@ -243,7 +250,12 @@ class EventWorkflow:
 
         # Raise ApplicationError if email is invalid
         if not is_valid:
-            raise ApplicationError(f"Invalid email address: {request.email}")
+            if self.state.config.require_work_email:
+                raise ApplicationError(
+                    "Please use a work email address. Personal email domains (gmail, yahoo, etc.) are not allowed."
+                )
+            else:
+                raise ApplicationError(f"Invalid email address: {request.email}")
 
         # Generate meaningful player_id using initials (e.g., "test-player-AS" for Alice Smith)
         first_initial = request.first_name[0].upper() if request.first_name else "X"

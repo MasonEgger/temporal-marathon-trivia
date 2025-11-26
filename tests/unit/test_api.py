@@ -108,6 +108,7 @@ class TestPlayerRegistration:
         from temporalio.exceptions import ApplicationError
 
         from src.api.main import app
+        from src.models.ux_config import UXConfig
 
         # Manually set up app.state
         mock_client = AsyncMock()
@@ -116,6 +117,11 @@ class TestPlayerRegistration:
         mock_handle.execute_update = AsyncMock(side_effect=ApplicationError("Invalid email domain"))
         mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
         app.state.temporal_client = mock_client
+
+        # Mock ux_config (required by new warning logic)
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.invalid_work_email_message = "Please use work email"
+        app.state.ux_config = mock_ux_config
 
         client = TestClient(app)
 
@@ -663,12 +669,18 @@ class TestLeaderboardEndpoint:
         """
         from src.api.main import app
         from src.models.leaderboard import LeaderboardEntry
+        from src.models.ux_config import UXConfig
 
         # Mock Redis - no cached data
         mock_redis = MagicMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
+
+        # Mock ux_config (required by leaderboard route)
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
 
         # Mock Temporal client
         mock_client = AsyncMock()
@@ -732,12 +744,18 @@ class TestLeaderboardEndpoint:
         """
         from src.api.main import app
         from src.models.leaderboard import LeaderboardEntry
+        from src.models.ux_config import UXConfig
 
         # Mock Redis - no cached data initially
         mock_redis = MagicMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
+
+        # Mock ux_config (required by leaderboard route)
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
 
         # Mock Temporal client
         mock_client = AsyncMock()
@@ -810,6 +828,13 @@ class TestLeaderboardEndpoint:
         mock_redis.get = AsyncMock(return_value=cached_data)
         app.state.redis = mock_redis
 
+        # Mock ux_config (required by leaderboard route)
+        from src.models.ux_config import UXConfig
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
+
         # Mock Temporal client - should NOT be called
         mock_client = AsyncMock()
         app.state.temporal_client = mock_client
@@ -841,6 +866,13 @@ class TestLeaderboardEndpoint:
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
+
+        # Mock ux_config (required by leaderboard route)
+        from src.models.ux_config import UXConfig
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
 
         # Mock Temporal client with 2 days
         mock_client = AsyncMock()
@@ -938,6 +970,20 @@ class TestLeaderboardEndpoint:
         mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
 
+        # Mock ux_config (required by leaderboard route)
+        from src.models.ux_config import UXConfig
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
+
+        # Mock ux_config (required by leaderboard route)
+        from src.models.ux_config import UXConfig
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
+
         # Mock Temporal client
         mock_client = AsyncMock()
         mock_event_handle = AsyncMock()
@@ -1012,6 +1058,20 @@ class TestLeaderboardEndpoint:
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
         app.state.redis = mock_redis
+
+        # Mock ux_config (required by leaderboard route)
+        from src.models.ux_config import UXConfig
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
+
+        # Mock ux_config (required by leaderboard route)
+        from src.models.ux_config import UXConfig
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.leaderboard_refresh_seconds = 30
+        app.state.ux_config = mock_ux_config
 
         # Mock Temporal client
         mock_client = AsyncMock()
@@ -1788,5 +1848,6 @@ class TestLandingPage:
         assert "Select a Day" in response.text
         assert "Leaderboard" in response.text
         assert 'hx-get="/api/leaderboard"' in response.text
-        assert 'hx-trigger="load, every 30s"' in response.text
+        # Leaderboard refresh interval is now configurable (was hardcoded to 30s)
+        assert 'hx-trigger="load, every' in response.text
         assert "Find My Rank" in response.text

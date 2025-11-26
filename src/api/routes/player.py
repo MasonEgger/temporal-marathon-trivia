@@ -7,6 +7,7 @@ import os
 from fastapi import APIRouter, Cookie, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from temporalio.client import WorkflowUpdateFailedError
 from temporalio.exceptions import ApplicationError
 
 from src.api.player_verification import verify_player_workflow
@@ -75,6 +76,36 @@ async def join(
     except ApplicationError as e:
         # Validation error from workflow (email, work domain, etc.)
         error_message = str(e)
+
+        # Check if this is a work email validation issue (business rule, not error)
+        ux_config = app.state.ux_config
+        # Check for work email keywords in the error message
+        work_email_keywords = ["work email", "personal email", "gmail", "yahoo", "consumer email"]
+        if any(keyword in error_message.lower() for keyword in work_email_keywords):
+            # Show as warning (yellow, "Notice") not error (red, "Oops!")
+            return templates.TemplateResponse(
+                request,
+                "components/warning.html",
+                {"message": ux_config.invalid_work_email_message}
+            )
+
+        # Other validation errors (malformed email, etc.)
+        return templates.TemplateResponse(request, "components/error.html", {"error": error_message})
+    except WorkflowUpdateFailedError as e:
+        # Workflow update failed - extract cause for better error messages
+        error_message = str(e.cause) if e.cause else str(e)
+
+        # Check if this is a work email validation issue
+        ux_config = app.state.ux_config
+        work_email_keywords = ["work email", "personal email", "gmail", "yahoo", "consumer email"]
+        if any(keyword in error_message.lower() for keyword in work_email_keywords):
+            return templates.TemplateResponse(
+                request,
+                "components/warning.html",
+                {"message": ux_config.invalid_work_email_message}
+            )
+
+        # Other validation errors
         return templates.TemplateResponse(request, "components/error.html", {"error": error_message})
     except Exception as e:
         # Unexpected error

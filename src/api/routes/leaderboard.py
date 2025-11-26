@@ -40,8 +40,9 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
     """
     redis = request.app.state.redis
     temporal_client: Client = request.app.state.temporal_client
+    ux_config = request.app.state.ux_config
 
-    # Check cache first (30s TTL)
+    # Check cache first (TTL from config)
     cached_data = await redis.get("leaderboard:full")
     if cached_data:
         # Cache hit - deserialize and render
@@ -96,7 +97,7 @@ async def get_leaderboard(request: Request) -> HTMLResponse:
             for entry in aggregated_leaderboard
         ]
     )
-    await redis.set("leaderboard:full", cache_data, ex=30)
+    await redis.set("leaderboard:full", cache_data, ex=ux_config.leaderboard_refresh_seconds)
 
     # Render template
     return templates.TemplateResponse(

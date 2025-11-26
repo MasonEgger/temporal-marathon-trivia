@@ -109,7 +109,7 @@
             <div
                 id="leaderboard-container"
                 hx-get="/api/leaderboard"
-                hx-trigger="load, every 30s"
+                hx-trigger="load, every {{ config.leaderboard_refresh_seconds }}s"
                 hx-swap="innerHTML"
                 class="bg-white shadow-2xl rounded-2xl p-6 md:p-8 border-2 border-gray-100 min-h-[400px]"
             >

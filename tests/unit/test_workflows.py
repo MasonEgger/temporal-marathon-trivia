@@ -310,6 +310,153 @@ class TestPlayerEntityWorkflowStartDay:
         assert len(result.options) == 4
         assert set(result.options.keys()) == {"A", "B", "C", "D"}
 
+    @pytest.mark.asyncio
+    async def test_start_day_resume_returns_current_question_not_first(self, client: Client, worker: Worker) -> None:
+        """Test that calling start_day on an in-progress day returns the current question, not question 1."""
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Start day and answer first question
+        q1 = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+        assert q1.id == "q1"
+
+        # Answer first question to advance to question 2
+        result = await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+        )
+        assert result.next_question is not None
+        assert result.next_question.id == "q2"
+
+        # Simulate closing browser - call start_day again (resume)
+        resumed_question = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+        # Should return question 2 (current), not question 1
+        assert resumed_question.id == "q2"
+
+    @pytest.mark.asyncio
+    async def test_start_day_resume_preserves_question_index(self, client: Client, worker: Worker) -> None:
+        """Test that resuming a day preserves the current_question_index."""
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Start day and answer two questions
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+        )
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+        )
+
+        # Check state before resume
+        state_before = await handle.query(PlayerEntityWorkflow.get_current_state)
+        assert state_before.current_question_index == 2  # 0-based: answered 0 and 1, now on 2
+
+        # Resume the day
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+        # Check state after resume - should be unchanged
+        state_after = await handle.query(PlayerEntityWorkflow.get_current_state)
+        assert state_after.current_question_index == 2
+
+    @pytest.mark.asyncio
+    async def test_start_day_resume_preserves_daily_score(self, client: Client, worker: Worker) -> None:
+        """Test that resuming a day preserves the accumulated daily score."""
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Start day and answer two questions correctly (both worth 1 point)
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q1", "B", False),  # Correct
+        )
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q2", "C", False),  # Correct
+        )
+
+        # Check score before resume
+        score_before = await handle.query(PlayerEntityWorkflow.get_score_for_day, "2025-03-10")
+        assert score_before == 2
+
+        # Resume the day
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+        # Check score after resume - should be unchanged
+        score_after = await handle.query(PlayerEntityWorkflow.get_score_for_day, "2025-03-10")
+        assert score_after == 2
+
+    @pytest.mark.asyncio
+    async def test_start_day_resume_allows_continuing_from_mid_point(self, client: Client, worker: Worker) -> None:
+        """Test complete resume flow: start, answer some, resume, continue answering."""
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
+
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Start day and answer question 1
+        await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+        result1 = await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+        )
+        assert result1.next_question is not None
+        assert result1.current_score == 1
+
+        # Simulate closing browser - resume the day
+        resumed_question = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+        assert resumed_question.id == "q2"
+
+        # Continue answering from where we left off
+        result2 = await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+        )
+        assert result2.next_question is not None
+        assert result2.current_score == 2
+
+        # Answer final question
+        result3 = await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+        )
+        assert result3.completion_message is not None
+        assert result3.current_score == 3
+
+        # Verify day is marked completed
+        is_completed = await handle.query(PlayerEntityWorkflow.has_completed_day, "2025-03-10")
+        assert is_completed is True
+
 
 class TestPlayerEntityWorkflowSubmitAnswer:
     """Test suite for PlayerEntityWorkflow submit_answer update handler."""

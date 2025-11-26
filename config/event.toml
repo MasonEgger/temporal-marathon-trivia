@@ -16,7 +16,7 @@ per_day = 5
 
 [features]
 show_correct_answer = true
-require_work_email = false  # Set to true to block gmail, yahoo, etc.
+require_work_email = true  # Set to true to block gmail, yahoo, etc.
 
 [s3]
 bucket_name = "marathon-trivia-exports"
@@ -25,18 +25,22 @@ region = "us-west-2"
 # UI/Presentation Configuration
 [ui]
 [ui.branding]
-title = "AWS re:Invent 2025 Trivia"
-description = "Test your cloud knowledge and win prizes!"
-base_url = "trivia.example.com"
+title = "Temporal re:Invent 2025 Trivia"
+description = "Test your tech knowledge and win prizes!"
+base_url = "trivia.ziggy.codes"
 
 [ui.messages]
 completion_message = "🎉 Great job! Check the leaderboard to see your ranking."
 day_over_message = "⏰ Today's trivia has ended. Come back tomorrow!"
 not_started_message = "📅 This day's trivia hasn't started yet."
 already_completed_message = "✅ You've already completed today's trivia!"
+invalid_work_email_message = "⚠️ Please use your work email address. Personal email domains (gmail, yahoo, etc.) are not permitted for this event."
 
 [ui.colors]
-primary_color = "#FF9900"  # AWS Orange
-secondary_color = "#232F3E"  # AWS Dark Blue
-background_color = "#FFFFFF"
+primary_color = "#444CD1"
+secondary_color = "#141414"
+background_color = "#F8FAFC"
 text_color = "#232F3E"
+
+[ui.performance]
+leaderboard_refresh_seconds = 5  # How often leaderboard auto-refreshes (seconds)

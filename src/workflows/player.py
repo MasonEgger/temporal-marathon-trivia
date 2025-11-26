@@ -8,7 +8,16 @@ from temporalio import workflow
 from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
-    from src.models.answer import AnswerResult, SubmitAnswerRequest
+    # Pre-import pydantic dependencies to avoid sandbox warnings
+    import annotated_types  # noqa: F401
+    import email_validator  # noqa: F401
+    import idna  # noqa: F401
+    import idna.uts46data  # noqa: F401
+    import pydantic_core  # noqa: F401
+
+    from src.activities.leaderboard import LeaderboardActivities
+    from src.activities.questions import QuestionsActivities
+    from src.models.answer import AnswerResult, SubmitAnswerRequest, SubmitScoreRequest
     from src.models.player import Player
     from src.models.question import Question
     from src.models.state import PlayerState
@@ -132,27 +141,32 @@ class PlayerEntityWorkflow:
 
     @workflow.update
     async def start_day(self, date: str, file_path: str = "config/questions.json") -> Question:
-        """Update handler to start a new day of questions.
+        """Update handler to start or resume a day of questions.
 
-        Loads questions for the specified date via activity and returns the first question.
-        Sets the current_day and resets current_question_index to 0.
+        If the day is already in progress (current_day matches), returns the current question
+        to allow resuming from where the player left off. If starting a new day, loads questions
+        and returns the first question.
 
         Args:
             date: Date string in ISO format (e.g., "2025-03-10")
             file_path: Path to questions JSON file (default: "config/questions.json")
 
         Returns:
-            Question: The first question for the specified date
+            Question: The current question (first if new day, current if resuming)
 
         Raises:
             RuntimeError: If workflow state is not initialized
-            ValueError: If day is already completed
+            ApplicationError: If day is already completed
 
         Example:
-            >>> # In workflow execution
+            >>> # Starting new day
             >>> first_question = await handle.execute_update(
             ...     PlayerEntityWorkflow.start_day, "2025-03-10"
             ... )
+            >>> # Later, after closing browser and reopening
+            >>> current_question = await handle.execute_update(
+            ...     PlayerEntityWorkflow.start_day, "2025-03-10"
+            ... )  # Returns question at current_question_index, not question 0
         """
         if self.state is None:
             raise RuntimeError("Workflow state not initialized")
@@ -161,9 +175,12 @@ class PlayerEntityWorkflow:
         if date in self.state.player.completed_days:
             raise ApplicationError(f"Day {date} already completed")
 
-        # Import activity class
-        from src.activities.questions import QuestionsActivities
+        # Check if resuming in-progress day
+        if self.state.current_day == date and self.state.current_questions is not None:
+            # Resume from current question (browser was closed and reopened)
+            return self._get_current_question()
 
+        # Starting new day - load questions
         # Call activity to get questions for the day
         questions = await workflow.execute_activity_method(
             QuestionsActivities.get_questions_for_day,
@@ -269,9 +286,6 @@ class PlayerEntityWorkflow:
             self.state.player.completed_days.add(request.date)
 
             # Submit score to DailyWorkflow for leaderboard aggregation via activity
-            from src.activities.leaderboard import LeaderboardActivities
-            from src.models.answer import SubmitScoreRequest
-
             # Calculate DailyWorkflow ID using predictable format: {event_id}-day-{date}
             parent_info = workflow.info().parent
             event_id = parent_info.workflow_id if parent_info is not None else "marathon-trivia-event"

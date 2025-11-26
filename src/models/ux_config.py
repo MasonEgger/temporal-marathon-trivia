@@ -23,10 +23,12 @@ class UXConfig:
         day_over_message: Message shown when day has ended.
         not_started_message: Message shown when day hasn't started yet.
         already_completed_message: Message shown when player already completed day.
+        invalid_work_email_message: Message shown when work email is required but consumer email provided.
         primary_color: Primary color (hex format, e.g., "#3b82f6").
         secondary_color: Secondary color (hex format).
         background_color: Background color (hex format).
         text_color: Text color (hex format).
+        leaderboard_refresh_seconds: How often to refresh leaderboard (default: 30).
 
     Example:
         >>> ux_config = UXConfig(
@@ -40,7 +42,8 @@ class UXConfig:
         ...     primary_color="#3b82f6",
         ...     secondary_color="#8b5cf6",
         ...     background_color="#ffffff",
-        ...     text_color="#1f2937"
+        ...     text_color="#1f2937",
+        ...     leaderboard_refresh_seconds=30
         ... )
         >>> ux_config.title
         'AWS re:Invent 2025 Trivia'
@@ -53,7 +56,9 @@ class UXConfig:
     day_over_message: str
     not_started_message: str
     already_completed_message: str
+    invalid_work_email_message: str
     primary_color: str
     secondary_color: str
     background_color: str
     text_color: str
+    leaderboard_refresh_seconds: int = 30

@@ -147,9 +147,9 @@ class ConfigActivities:
 
         # Extract sections - provide helpful error messages for missing sections
         try:
-            event_section = data["event"]
+            ui_branding_section = data["ui"]["branding"]
         except KeyError as e:
-            raise ValueError("Missing required section '[event]' in configuration file") from e
+            raise ValueError("Missing required section '[ui.branding]' in configuration file") from e
 
         try:
             ui_messages_section = data["ui"]["messages"]
@@ -161,17 +161,24 @@ class ConfigActivities:
         except KeyError as e:
             raise ValueError("Missing required section '[ui.colors]' in configuration file") from e
 
+        try:
+            ui_performance_section = data["ui"]["performance"]
+        except KeyError as e:
+            raise ValueError("Missing required section '[ui.performance]' in configuration file") from e
+
         # Create and return UXConfig instance
         return UXConfig(
-            title=event_section["title"],
-            description=event_section["description"],
-            base_url=event_section["base_url"],
+            title=ui_branding_section["title"],
+            description=ui_branding_section["description"],
+            base_url=ui_branding_section["base_url"],
             completion_message=ui_messages_section["completion_message"],
             day_over_message=ui_messages_section["day_over_message"],
             not_started_message=ui_messages_section["not_started_message"],
             already_completed_message=ui_messages_section["already_completed_message"],
+            invalid_work_email_message=ui_messages_section["invalid_work_email_message"],
             primary_color=ui_colors_section["primary_color"],
             secondary_color=ui_colors_section["secondary_color"],
             background_color=ui_colors_section["background_color"],
             text_color=ui_colors_section["text_color"],
+            leaderboard_refresh_seconds=ui_performance_section["leaderboard_refresh_seconds"],
         )

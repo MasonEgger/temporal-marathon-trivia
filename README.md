@@ -27,33 +27,69 @@ uv sync --extra dev
 
 ### 2. Configure Your Event
 
-Edit `config/event.toml` with your event details:
+Edit `config/event.toml` with your event details. The configuration is split into two sections:
+- **Business Logic** (`[event]`, `[dates]`, `[features]`, etc.) - Controls workflow behavior
+- **UI/Presentation** (`[ui.*]`) - Controls appearance and messaging
 
 ```toml
+# Business Logic Configuration
 [event]
-title = "AWS re:Invent 2025 Trivia"
+title = "AWS re:Invent 2025 Trivia"  # Legacy - kept for backwards compatibility
 description = "Test your cloud knowledge and win prizes!"
 base_url = "trivia.example.com"
 
 [dates]
-start_date = "2025-12-01"  # YYYY-MM-DD
-end_date = "2025-12-05"
-day_start_time = "09:00:00"  # HH:MM:SS
-day_end_time = "17:00:00"
-timezone = "America/Los_Angeles"  # IANA timezone
+start_date = "2025-12-01"  # YYYY-MM-DD format (event first day)
+end_date = "2025-12-05"    # YYYY-MM-DD format (event last day, inclusive)
+day_start_time = "09:00:00"  # HH:MM:SS (when daily questions become available)
+day_end_time = "17:00:00"    # HH:MM:SS (when daily questions close)
+timezone = "America/Los_Angeles"  # IANA timezone (e.g., America/New_York, UTC)
 
 [questions]
-file_path = "config/questions.json"
-per_day = 10
+file_path = "config/questions.json"  # Path to questions JSON file
+per_day = 10  # Number of questions per day (must match questions.json)
 
 [features]
-show_correct_answer = true
-require_work_email = false  # Set to true to block gmail, yahoo, etc.
+show_correct_answer = true   # Show correct answer after submission
+require_work_email = true    # Block consumer email domains (gmail, yahoo, etc.)
 
 [s3]
-bucket_name = "marathon-trivia-exports"
-region = "us-west-2"
+bucket_name = "marathon-trivia-exports"  # S3 bucket for CSV exports
+region = "us-west-2"  # AWS region
+
+# UI/Presentation Configuration
+[ui.branding]
+title = "Temporal re:Invent 2025 Trivia"  # Displayed on landing page
+description = "Test your tech knowledge and win prizes!"  # Subtitle text
+base_url = "trivia.ziggy.codes"  # Your domain (for display purposes)
+
+[ui.messages]
+completion_message = "🎉 Great job! Check the leaderboard to see your ranking."
+day_over_message = "⏰ Today's trivia has ended. Come back tomorrow!"
+not_started_message = "📅 This day's trivia hasn't started yet."
+already_completed_message = "✅ You've already completed today's trivia!"
+invalid_work_email_message = "⚠️ Please use your work email address. Personal email domains (gmail, yahoo, etc.) are not permitted for this event."
+
+[ui.colors]
+primary_color = "#444CD1"      # Primary brand color (hex)
+secondary_color = "#141414"    # Secondary brand color (hex)
+background_color = "#F8FAFC"   # Page background (hex)
+text_color = "#232F3E"         # Text color (hex)
+
+[ui.performance]
+leaderboard_refresh_seconds = 5  # How often leaderboard auto-refreshes (default: 30)
 ```
+
+**Configuration Tips:**
+
+- **Email Validation**: Set `require_work_email = true` for corporate events to block gmail/yahoo/hotmail
+- **Blocked Domains**: gmail.com, yahoo.com, hotmail.com, outlook.com, aol.com, icloud.com
+- **Leaderboard Refresh**:
+  - 5s = Super responsive (demo/trade show)
+  - 10s = Fast refresh
+  - 30s = Conservative (default, lower server load)
+- **Colors**: Use your brand colors for primary/secondary
+- **Messages**: All user-facing text is configurable - customize for your event!
 
 Edit `config/questions.json` with your trivia questions:
 
@@ -160,15 +196,82 @@ open http://localhost:8000
 
 Or visit: `http://localhost:8000` in your browser.
 
+## Configuration Reference
+
+### Resume Functionality
+
+**Players can close their browser mid-session and resume later!**
+
+The system tracks:
+- Current question index (where player left off)
+- Daily score accumulated so far
+- Questions loaded for the day
+
+**How it works:**
+1. Player answers questions 1-3, closes browser
+2. Player returns hours later, clicks day button
+3. Button shows **"▶ Resume"** (orange, pulsing animation)
+4. Player continues from question 4 (not question 1!)
+5. Score and progress are preserved via Temporal's durable state
+
+**Day boundaries**: Once the day ends (`day_end_time`), the workflow completes and resume is no longer possible.
+
+### Email Validation
+
+When `require_work_email = true`:
+- **Blocked domains**: gmail.com, yahoo.com, hotmail.com, outlook.com, aol.com, icloud.com
+- **UX**: Shows yellow warning (not red error) with configurable message
+- **Customization**: Edit `invalid_work_email_message` in `[ui.messages]`
+
+**Visual distinction:**
+- 🟡 **Warning** (yellow): Business rule validation (work email required, already registered)
+- 🔴 **Error** (red): System failures (network error, workflow not found)
+
+### Leaderboard Refresh
+
+Controlled by single config value: `leaderboard_refresh_seconds` in `[ui.performance]`
+
+**What it controls:**
+1. **Frontend polling**: HTMX auto-refresh interval
+2. **Backend caching**: Redis TTL (synchronized)
+3. **Server load**: Lower values = more frequent queries
+
+**Recommended values:**
+- **5s**: Trade show kiosks, demos (high engagement, visible updates)
+- **10s**: Fast refresh, moderate load
+- **30s**: Conservative, lower server load (default)
+
+### Color Customization
+
+All colors support **hex format** (`#RRGGBB`):
+
+```toml
+[ui.colors]
+primary_color = "#444CD1"      # Buttons, headings, accents
+secondary_color = "#141414"    # Secondary buttons, borders
+background_color = "#F8FAFC"   # Page background
+text_color = "#232F3E"         # Body text
+```
+
+**Trade show tips:**
+- High contrast for visibility (light backgrounds work best)
+- Bold primary colors for brand recognition
+- Test on projector/kiosk screen before event
+
 ## Using the Application
 
 ### Player Journey
 
 1. **Registration**: Enter first name, last name, and email
-2. **Select Day**: Click on an active day button (green = available)
+   - If work email required: Rejected emails show friendly yellow warning (not error)
+2. **Select Day**: Click on day button
+   - **Green "✓ Completed"**: Already finished
+   - **Orange "▶ Resume"**: In-progress, can continue from where you left off
+   - **Blue "🎮 Play Now"**: Available to start
+   - **Gray "🔒 Not Available"**: Future/past days
 3. **Answer Questions**: Choose A/B/C/D for each question
-4. **View Results**: See your score and correct answers (if enabled)
-5. **Check Leaderboard**: View your rank against other players
+4. **View Results**: See your score and correct answers (if `show_correct_answer = true`)
+5. **Check Leaderboard**: Auto-refreshes every 5-30 seconds (configurable)
 
 ### Admin Operations
 
@@ -264,20 +367,37 @@ print('✅ Configuration valid!')
 "
 ```
 
-### Player Registration Returns Error
+### Player Registration Shows "Work Email Required"
 
-**Problem**: "Email validation failed" when `require_work_email = true`
+**Behavior**: Yellow warning screen (not red error) when using gmail/yahoo/etc. with `require_work_email = true`
 
-**Solution**: Use a work email (not gmail, yahoo, hotmail, etc.) or set `require_work_email = false` in `config/event.toml`
+**This is expected!** The warning shows:
+- ⚠️ Yellow "Notice" card
+- Configurable message from `[ui.messages].invalid_work_email_message`
+- "🔙 Try Again" button
+
+**Solutions**:
+1. Use a work/corporate email address
+2. Or set `require_work_email = false` in `config/event.toml`
+
+**Blocked domains**: gmail.com, yahoo.com, hotmail.com, outlook.com, aol.com, icloud.com
 
 ### Leaderboard Not Updating
 
 **Problem**: Leaderboard shows old data
 
-**Solution**: Check Redis TTL (30 seconds default) or clear cache
+**Solution**: Check refresh interval in `config/event.toml`:
+```toml
+[ui.performance]
+leaderboard_refresh_seconds = 5  # Adjust as needed
+```
+
+Or clear Redis cache:
 ```bash
 redis-cli FLUSHALL
 ```
+
+**Note**: If you change `leaderboard_refresh_seconds`, restart the API server to pick up the change.
 
 ### Port Already in Use
 
@@ -318,9 +438,14 @@ EventWorkflow (parent, entire event)
 
 ### Caching Strategy
 
-- **Leaderboard**: 30s TTL (matches frontend polling)
+- **Leaderboard**: Configurable TTL (matches frontend polling interval from `[ui.performance]`)
 - **Player state**: 10s TTL
 - **Config**: Permanent (loaded at startup)
+
+**Note**: Leaderboard refresh interval is synchronized across:
+1. Frontend HTMX polling (`hx-trigger="every Xs"`)
+2. Redis cache expiration (`ex=X`)
+3. Single config value: `leaderboard_refresh_seconds` in `event.toml`
 
 ## Known Limitations
 

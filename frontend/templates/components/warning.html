@@ -1,0 +1,33 @@
+<!-- Warning message template for HTMX (business validation, not system error) -->
+<div class="warning-container max-w-2xl mx-auto">
+    <!-- Warning Card -->
+    <div class="bg-white shadow-2xl rounded-3xl p-8 md:p-12 border-2 border-yellow-200 text-center">
+        <!-- Warning icon and heading -->
+        <div class="mb-8">
+            <div class="text-8xl mb-4">⚠️</div>
+            <h2 class="text-3xl md:text-5xl font-extrabold text-yellow-600 mb-2">
+                Notice
+            </h2>
+            <p class="text-xl md:text-2xl text-gray-600 font-medium">
+                Please review the requirement below
+            </p>
+        </div>
+
+        <!-- Warning message -->
+        <div class="warning-message mb-8 p-6 bg-yellow-50 rounded-2xl border-2 border-yellow-200">
+            <p class="text-lg md:text-2xl text-gray-800 font-semibold leading-relaxed">
+                {{ message }}
+            </p>
+        </div>
+
+        <!-- Action button -->
+        <div class="actions">
+            <a
+                href="/"
+                class="bg-yellow-500 hover:bg-yellow-600 text-white py-4 px-8 rounded-xl font-bold text-xl shadow-lg hover:shadow-xl transition-all inline-block"
+            >
+                🔙 Try Again
+            </a>
+        </div>
+    </div>
+</div>
