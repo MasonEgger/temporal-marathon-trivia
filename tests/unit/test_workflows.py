@@ -139,355 +139,278 @@ class TestPlayerEntityWorkflow:
     """Test suite for PlayerEntityWorkflow - basic structure and state management."""
 
     @pytest.mark.asyncio
-    async def test_workflow_can_be_started_with_player_info(self) -> None:
+    async def test_workflow_can_be_started_with_player_info(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that PlayerEntityWorkflow can be started with player information."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            # Configure client with pydantic data converter
-            from temporalio.client import Client
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
-                # Workflow should be running
-                assert handle is not None
+        # Workflow should be running
+        assert handle is not None
 
     @pytest.mark.asyncio
-    async def test_workflow_initializes_with_correct_player_state(self) -> None:
+    async def test_workflow_initializes_with_correct_player_state(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that PlayerEntityWorkflow initializes with zero scores and empty completed days."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            # Configure client with pydantic data converter
-            from temporalio.client import Client
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
-                # Query current state
-                state = await handle.query(PlayerEntityWorkflow.get_current_state)
-                assert state.player.id == "player-123"
-                assert state.player.email == "alice@example.com"
-                assert state.player.first_name == "Alice"
-                assert state.player.last_name == "Smith"
-                assert state.player.total_score == 0
-                assert state.player.daily_scores == {}
-                assert state.player.completed_days == set()
-                assert state.current_day is None
-                assert state.current_question_index == 0
+        # Query current state
+        state = await handle.query(PlayerEntityWorkflow.get_current_state)
+        assert state.player.id == "player-123"
+        assert state.player.email == "alice@example.com"
+        assert state.player.first_name == "Alice"
+        assert state.player.last_name == "Smith"
+        assert state.player.total_score == 0
+        assert state.player.daily_scores == {}
+        assert state.player.completed_days == set()
+        assert state.current_day is None
+        assert state.current_question_index == 0
 
     @pytest.mark.asyncio
-    async def test_query_get_current_state_returns_player_state(self) -> None:
+    async def test_query_get_current_state_returns_player_state(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that get_current_state query returns PlayerState."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            # Configure client with pydantic data converter
-            from temporalio.client import Client
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
-                # Query should return PlayerState instance
-                state = await handle.query(PlayerEntityWorkflow.get_current_state)
-                assert isinstance(state, PlayerState)
+        # Query should return PlayerState instance
+        state = await handle.query(PlayerEntityWorkflow.get_current_state)
+        assert isinstance(state, PlayerState)
 
     @pytest.mark.asyncio
-    async def test_query_get_score_for_day_returns_zero_initially(self) -> None:
+    async def test_query_get_score_for_day_returns_zero_initially(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that get_score_for_day query returns 0 for unplayed days."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            # Configure client with pydantic data converter
-            from temporalio.client import Client
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
-                # Score for any day should be 0 initially
-                score = await handle.query(
-                    PlayerEntityWorkflow.get_score_for_day, "2025-03-10"
-                )
-                assert score == 0
+        # Score for any day should be 0 initially
+        score = await handle.query(
+            PlayerEntityWorkflow.get_score_for_day, "2025-03-10"
+        )
+        assert score == 0
 
     @pytest.mark.asyncio
-    async def test_query_has_completed_day_returns_false_initially(self) -> None:
+    async def test_query_has_completed_day_returns_false_initially(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that has_completed_day query returns False for unplayed days."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            # Configure client with pydantic data converter
-            from temporalio.client import Client
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
-                # No days should be completed initially
-                completed = await handle.query(
-                    PlayerEntityWorkflow.has_completed_day, "2025-03-10"
-                )
-                assert completed is False
+        # No days should be completed initially
+        completed = await handle.query(
+            PlayerEntityWorkflow.has_completed_day, "2025-03-10"
+        )
+        assert completed is False
 
 
 class TestPlayerEntityWorkflowStartDay:
     """Test suite for PlayerEntityWorkflow start_day update handler."""
 
     @pytest.mark.asyncio
-    async def test_start_day_returns_first_question(self) -> None:
+    async def test_start_day_returns_first_question(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that start_day returns the first Question for the specified date."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            mock_activities = MockQuestionsActivities()
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-                activities=[mock_activities.get_questions_for_day],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-                # Call start_day update handler
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+        # Call start_day update handler
+        result = await handle.execute_update(
+            PlayerEntityWorkflow.start_day, "2025-03-10"
+        )
 
-                # Should return first question
-                assert isinstance(result, Question)
-                assert result.id == "q1"
-                assert result.text == "What is 2+2?"
+        # Should return first question
+        assert isinstance(result, Question)
+        assert result.id == "q1"
+        assert result.text == "What is 2+2?"
 
     @pytest.mark.asyncio
-    async def test_start_day_sets_current_day_in_state(self) -> None:
+    async def test_start_day_sets_current_day_in_state(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that start_day sets current_day in workflow state."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            mock_activities = MockQuestionsActivities()
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-                activities=[mock_activities.get_questions_for_day],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-                # Call start_day
-                await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+        # Call start_day
+        await handle.execute_update(
+            PlayerEntityWorkflow.start_day, "2025-03-10"
+        )
 
-                # Query state to verify current_day is set
-                state = await handle.query(PlayerEntityWorkflow.get_current_state)
-                assert state.current_day == "2025-03-10"
+        # Query state to verify current_day is set
+        state = await handle.query(PlayerEntityWorkflow.get_current_state)
+        assert state.current_day == "2025-03-10"
 
     @pytest.mark.asyncio
-    async def test_start_day_sets_current_question_index_to_zero(self) -> None:
+    async def test_start_day_sets_current_question_index_to_zero(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that start_day sets current_question_index to 0."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            mock_activities = MockQuestionsActivities()
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-                activities=[mock_activities.get_questions_for_day],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-                # Call start_day
-                await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+        # Call start_day
+        await handle.execute_update(
+            PlayerEntityWorkflow.start_day, "2025-03-10"
+        )
 
-                # Query state to verify current_question_index is 0
-                state = await handle.query(PlayerEntityWorkflow.get_current_state)
-                assert state.current_question_index == 0
+        # Query state to verify current_question_index is 0
+        state = await handle.query(PlayerEntityWorkflow.get_current_state)
+        assert state.current_question_index == 0
 
     @pytest.mark.asyncio
-    async def test_start_day_raises_error_if_day_already_completed(self) -> None:
+    async def test_start_day_raises_error_if_day_already_completed(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that start_day raises error if day is already completed."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            mock_activities = MockQuestionsActivities()
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-                activities=[mock_activities.get_questions_for_day],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-                # Start day and complete all questions
-                await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
-                await handle.execute_update(
-                    PlayerEntityWorkflow.submit_answer,
-                    SubmitAnswerRequest("2025-03-10", "q1", "B", False),
-                )
-                await handle.execute_update(
-                    PlayerEntityWorkflow.submit_answer,
-                    SubmitAnswerRequest("2025-03-10", "q2", "C", False),
-                )
-                await handle.execute_update(
-                    PlayerEntityWorkflow.submit_answer,
-                    SubmitAnswerRequest("2025-03-10", "q3", "B", False),
-                )
+        # Start day and complete all questions
+        await handle.execute_update(
+            PlayerEntityWorkflow.start_day, "2025-03-10"
+        )
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+        )
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+        )
+        await handle.execute_update(
+            PlayerEntityWorkflow.submit_answer,
+            SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+        )
 
-                # Try to start the same day again - should raise error
-                with pytest.raises(WorkflowUpdateFailedError) as exc_info:
-                    await handle.execute_update(
-                        PlayerEntityWorkflow.start_day, "2025-03-10"
-                    )
-                assert "already completed" in str(exc_info.value.cause).lower()
+        # Try to start the same day again - should raise error
+        with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+            await handle.execute_update(
+                PlayerEntityWorkflow.start_day, "2025-03-10"
+            )
+        assert "already completed" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
-    async def test_start_day_calls_get_questions_for_day_activity(self) -> None:
+    async def test_start_day_calls_get_questions_for_day_activity(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that start_day calls the get_questions_for_day activity."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            mock_activities = MockQuestionsActivities()
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-                activities=[mock_activities.get_questions_for_day],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-                # Call start_day - if activity isn't called, this will fail
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+        # Call start_day - if activity isn't called, this will fail
+        result = await handle.execute_update(
+            PlayerEntityWorkflow.start_day, "2025-03-10"
+        )
 
-                # If we get a result, activity was called successfully
-                assert result is not None
+        # If we get a result, activity was called successfully
+        assert result is not None
 
     @pytest.mark.asyncio
-    async def test_start_day_returns_question_with_correct_structure(self) -> None:
+    async def test_start_day_returns_question_with_correct_structure(
+        self, client: Client, worker: Worker
+    ) -> None:
         """Test that start_day returns a Question object with proper structure."""
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            new_config = env.client.config()
-            new_config["data_converter"] = pydantic_data_converter
-            client = Client(**new_config)
+        handle = await client.start_workflow(
+            PlayerEntityWorkflow.run,
+            args=["player-123", "alice@example.com", "Alice", "Smith"],
+            id=f"test-player-workflow-{uuid.uuid4()}",
+            task_queue="test-queue",
+        )
 
-            mock_activities = MockQuestionsActivities()
-            async with Worker(
-                client,
-                task_queue="test-queue",
-                workflows=[PlayerEntityWorkflow],
-                activities=[mock_activities.get_questions_for_day],
-            ):
-                handle = await client.start_workflow(
-                    PlayerEntityWorkflow.run,
-                    args=["player-123", "alice@example.com", "Alice", "Smith"],
-                    id=f"test-player-workflow-{uuid.uuid4()}",
-                    task_queue="test-queue",
-                )
+        # Allow workflow to initialize state
+        await asyncio.sleep(0.1)
 
-                # Call start_day
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+        # Call start_day
+        result = await handle.execute_update(
+            PlayerEntityWorkflow.start_day, "2025-03-10"
+        )
 
-                # Verify Question structure
-                assert isinstance(result, Question)
-                assert hasattr(result, "id")
-                assert hasattr(result, "text")
-                assert hasattr(result, "options")
-                assert hasattr(result, "correct_answer")
-                assert len(result.options) == 4
-                assert set(result.options.keys()) == {"A", "B", "C", "D"}
+        # Verify Question structure
+        assert isinstance(result, Question)
+        assert hasattr(result, "id")
+        assert hasattr(result, "text")
+        assert hasattr(result, "options")
+        assert hasattr(result, "correct_answer")
+        assert len(result.options) == 4
+        assert set(result.options.keys()) == {"A", "B", "C", "D"}
 
 
 class TestPlayerEntityWorkflowSubmitAnswer:
