@@ -2,7 +2,6 @@
 # Provides reusable fixtures for WorkflowEnvironment, Client, Worker, and mock activities.
 
 import concurrent.futures
-import uuid
 from collections.abc import AsyncGenerator
 from datetime import date, time
 
@@ -19,7 +18,6 @@ from src.models.question import Question
 from src.workflows.daily import DailyWorkflow
 from src.workflows.event import EventWorkflow
 from src.workflows.player import PlayerEntityWorkflow
-
 
 # ============================================================================
 # Mock Activity Classes
@@ -141,7 +139,7 @@ def create_test_questions() -> list[Question]:
 
 
 @pytest_asyncio.fixture
-async def temporal_env() -> AsyncGenerator[WorkflowEnvironment, None]:
+async def temporal_env() -> AsyncGenerator[WorkflowEnvironment]:
     """Create time-skipping Temporal test environment.
 
     Yields:
@@ -202,7 +200,7 @@ async def worker(
     mock_config_activities: MockConfigActivities,
     mock_questions_activities: MockQuestionsActivities,
     mock_email_activities: MockEmailActivities,
-) -> AsyncGenerator[Worker, None]:
+) -> AsyncGenerator[Worker]:
     """Create worker with ALL workflows and ALL mock activities registered.
 
     This is a catch-all worker fixture that registers all 3 workflows and all
