@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from pydantic import EmailStr
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from src.models.question import Question
-
 
 @pydantic_dataclass
 @dataclass
@@ -69,29 +67,3 @@ class Player:
         if self.last_name:
             return f"{self.first_name} {self.last_name[0]}."
         return self.first_name
-
-
-@dataclass
-class PlayerState:
-    """State maintained by PlayerEntityWorkflow for a single player.
-
-    This dataclass encapsulates the workflow state including the Player model
-    and additional workflow-specific fields for tracking current progress.
-
-    Attributes:
-        player: Player model instance with identity and score tracking
-        current_day: Current day being played (None if no day started)
-        current_question_index: Index of current question in current day (0-based)
-        current_questions: List of questions for the current day (None if no day started)
-
-    Example:
-        >>> player = Player(id="p1", email="a@ex.com", first_name="Alice", last_name="Smith")
-        >>> state = PlayerState(player=player, current_day="2025-03-10", current_question_index=0)
-        >>> state.current_day
-        '2025-03-10'
-    """
-
-    player: Player
-    current_day: str | None = None
-    current_question_index: int = 0
-    current_questions: list[Question] | None = None

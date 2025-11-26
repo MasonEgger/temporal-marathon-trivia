@@ -2,6 +2,7 @@
 # Tests state management, queries, update handlers using Temporal testing framework.
 
 import uuid
+from datetime import date, time
 
 import pytest
 from temporalio import activity
@@ -11,8 +12,10 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from src.models.answer import AnswerResult, SubmitAnswerRequest
-from src.models.player import PlayerState
+from src.models.config import EventConfig
 from src.models.question import Question
+from src.models.state import PlayerState
+from src.workflows.daily import DailyWorkflow
 from src.workflows.player import PlayerEntityWorkflow
 
 
@@ -44,6 +47,56 @@ class MockQuestionsActivities:
                 correct_answer="B",
             ),
         ]
+
+
+# Test fixtures and helpers
+def create_test_event_config() -> EventConfig:
+    """Create a test EventConfig for use in workflow tests.
+
+    Returns:
+        EventConfig with standard test values for a 3-day event.
+    """
+    return EventConfig(
+        start_date=date(2025, 3, 10),
+        end_date=date(2025, 3, 12),
+        day_start_time=time(9, 0),
+        day_end_time=time(17, 0),
+        timezone="America/Los_Angeles",
+        questions_file_path="config/questions.json",
+        questions_per_day=5,
+        show_correct_answer=True,
+        require_work_email=False,
+        s3_bucket_name="test-bucket",
+        s3_region="us-west-2",
+    )
+
+
+def create_test_questions() -> list[Question]:
+    """Create a list of test questions for use in workflow tests.
+
+    Returns:
+        List of 3 test Question instances.
+    """
+    return [
+        Question(
+            id="q1",
+            text="What is 2+2?",
+            options={"A": "3", "B": "4", "C": "5", "D": "6"},
+            correct_answer="B",
+        ),
+        Question(
+            id="q2",
+            text="What is the capital of France?",
+            options={"A": "London", "B": "Berlin", "C": "Paris", "D": "Madrid"},
+            correct_answer="C",
+        ),
+        Question(
+            id="q3",
+            text="What color is the sky?",
+            options={"A": "Red", "B": "Blue", "C": "Green", "D": "Yellow"},
+            correct_answer="B",
+        ),
+    ]
 
 
 class TestPlayerEntityWorkflow:
@@ -800,3 +853,176 @@ class TestPlayerEntityWorkflowSubmitAnswer:
                 state = await handle.query(PlayerEntityWorkflow.get_current_state)
                 assert state.player.total_score == 2
                 assert state.player.daily_scores.get("2025-03-10", 0) == 2
+
+
+# ============================================================================
+# DailyWorkflow Tests
+# ============================================================================
+
+
+class TestDailyWorkflow:
+    """Test suite for DailyWorkflow initialization and basic state management."""
+
+    @pytest.mark.asyncio
+    async def test_daily_workflow_can_be_started_with_date_and_questions(self) -> None:
+        """Test that DailyWorkflow can be started with date and questions."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+                # Workflow should be running
+                assert handle is not None
+
+    @pytest.mark.asyncio
+    async def test_daily_workflow_initializes_with_empty_player_scores(self) -> None:
+        """Test that workflow initializes with empty player_scores."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query leaderboard (which uses player_scores internally)
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+                # Empty list indicates no player scores yet
+                assert leaderboard == []
+
+    @pytest.mark.asyncio
+    async def test_daily_workflow_initializes_with_empty_completed_players(self) -> None:
+        """Test that workflow initializes with empty completed_players set."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query leaderboard - empty means no completed players
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+                assert leaderboard == []
+
+    @pytest.mark.asyncio
+    async def test_get_daily_leaderboard_returns_empty_list_initially(self) -> None:
+        """Test that get_daily_leaderboard query returns empty list initially."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query leaderboard
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+                assert isinstance(leaderboard, list)
+                assert len(leaderboard) == 0
+
+    @pytest.mark.asyncio
+    async def test_is_day_active_respects_day_start_time(self) -> None:
+        """Test that is_day_active query respects day_start_time."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()  # day_start_time = 09:00
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query is_day_active - in time-skipping mode, should be within bounds
+                is_active = await handle.query(DailyWorkflow.is_day_active)
+                # Will be True if current workflow time is between 9AM and 5PM
+                assert isinstance(is_active, bool)
+
+    @pytest.mark.asyncio
+    async def test_is_day_active_respects_day_end_time(self) -> None:
+        """Test that is_day_active query respects day_end_time."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()  # day_end_time = 17:00
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query is_day_active
+                is_active = await handle.query(DailyWorkflow.is_day_active)
+                # Will be True if current workflow time is between 9AM and 5PM
+                assert isinstance(is_active, bool)

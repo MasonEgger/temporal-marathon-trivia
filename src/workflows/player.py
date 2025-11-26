@@ -8,8 +8,9 @@ from temporalio import workflow
 from temporalio.exceptions import ApplicationError
 
 from src.models.answer import AnswerResult, SubmitAnswerRequest
-from src.models.player import Player, PlayerState
+from src.models.player import Player
 from src.models.question import Question
+from src.models.state import PlayerState
 
 
 @workflow.defn

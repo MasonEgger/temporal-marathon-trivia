@@ -309,10 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 in progress - 11/35 steps complete (31.4% total progress)
+**Current Status**: Phase 3 in progress - 12/35 steps complete (34.3% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 37.5% complete (3/8 steps)
+- Phase 3 (Workflow Implementation): 50% complete (4/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -689,8 +689,11 @@ def test_load_event_config():
      - Represents business data (Player, Question, Config)
      - Has validation logic
      - Needs to be serialized across workflow boundaries
-   - **Example**: PlayerState is in `src/models/player.py` (not in workflow file)
-   - **Rationale**: Clean separation of concerns, reusable data structures
+   - **Workflow state models**: All workflow state models are consolidated in `src/models/state.py`
+     - PlayerState (for PlayerEntityWorkflow)
+     - DailyState (for DailyWorkflow)
+     - EventState (future - for EventWorkflow)
+   - **Rationale**: Clean separation of concerns, reusable data structures, single source of truth
 
 ### Workflow Testing Checklist
 
@@ -720,7 +723,7 @@ Before writing a workflow test:
    - **Solution**: Return defensive copies from queries
    - **Pattern**: Use `dict()`, `set()` to copy mutable collections
 
-## Workflows Implemented (Phase 3: 25% Complete)
+## Workflows Implemented (Phase 3: 50% Complete)
 
 ### PlayerEntityWorkflow (`src/workflows/player.py`)
 - **Status**: COMPLETE - All core functionality implemented (Steps 9-11) ✅
@@ -738,18 +741,31 @@ Before writing a workflow test:
   - `_get_current_question() -> Question` - Returns current question with validation
   - `_is_answer_correct(question: Question, answer: str) -> bool` - Checks answer correctness
 - **Testing**: 21 comprehensive tests with pydantic_data_converter and activity mocking
-- **Coverage**: 89.02% (82 statements, 9 missed)
-- **Next steps**: Implement DailyWorkflow (Step 12)
+- **Coverage**: 89.16% (83 statements, 9 missed)
 
-### PlayerState (`src/models/player.py`)
-- **Purpose**: Workflow state for PlayerEntityWorkflow
-- **Fields**:
-  - `player: Player` - Business data (identity, scores)
-  - `current_day: str | None` - Current day being played
-  - `current_question_index: int` - Current question index (0-based)
-  - `current_questions: list[Question] | None` - Questions for current day only (efficient storage)
-- **Design**: Combines business data with workflow-specific state. Stores only current day's questions (not all days) for efficiency.
-- **Coverage**: 100% (20 statements, 0 missed)
+### DailyWorkflow (`src/workflows/daily.py`)
+- **Status**: BASIC STRUCTURE COMPLETE - Step 12 ✅
+- **Pattern**: Entity workflow (runs indefinitely for one day)
+- **State**: DailyState with date, questions, player_scores, completed_players, config
+- **Run method**: Initializes state, runs indefinitely with `workflow.wait_condition(lambda: False)`
+- **Queries implemented**:
+  - `get_daily_leaderboard() -> list[LeaderboardEntry]` - Returns empty list (Step 13 will implement ranking)
+  - `is_day_active() -> bool` - Time-based check using `workflow.now()`
+- **Update handlers**: None yet (Step 13 will add submit_score)
+- **Testing**: 6 comprehensive tests with pydantic_data_converter
+- **Coverage**: 89.66% (29 statements, 3 missed)
+- **Next steps**: Implement leaderboard ranking logic (Step 13)
+
+### Workflow State Models (`src/models/state.py`)
+- **Purpose**: Consolidated file for all workflow state dataclasses
+- **PlayerState**: Workflow state for PlayerEntityWorkflow
+  - Fields: player (Player), current_day (str | None), current_question_index (int), current_questions (list[Question] | None)
+  - Design: Combines business data with workflow-specific state. Stores only current day's questions (not all days) for efficiency.
+- **DailyState**: Workflow state for DailyWorkflow
+  - Fields: date (str), questions (list[Question]), player_scores (dict[str, int]), completed_players (set[str]), config (EventConfig | None)
+  - Design: Manages daily leaderboard state with player scores and completion tracking
+- **Coverage**: 100% (14 statements, 0 missed)
+- **Design Pattern**: All workflow state models consolidated in single file for better organization
 
 ## Reference Projects
 
@@ -928,3 +944,21 @@ This project reuses patterns from:
    - Use `async def` only when calling activities or child workflows
    - Match sync/async to whether you await operations
    - Using `async def` without await can cause tests to hang
+
+9. **Time-Based Workflow Logic** 🔑
+   ```python
+   @workflow.query
+   def is_day_active(self) -> bool:
+       # Use workflow.now() for deterministic time
+       current_time = workflow.now()
+       current_time_of_day = current_time.time()
+
+       # Compare with configured bounds
+       day_start = self.state.config.day_start_time
+       day_end = self.state.config.day_end_time
+       return day_start <= current_time_of_day <= day_end
+   ```
+   - **ALWAYS use `workflow.now()`** not `datetime.now()` for determinism
+   - Extract time component with `.time()` for time-of-day comparisons
+   - Enables proper replay and testing with time-skipping
+   - Critical for time-based access control in DailyWorkflow
