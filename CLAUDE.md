@@ -166,14 +166,49 @@ async def submit_answer(...) -> HTMLResponse:
 - **TDD approach**: Write failing tests first, implement to pass, refactor
 - Focus on **application logic only** (not framework behavior)
 
-### Critical Testing Patterns (from temporal-trivia-python)
+### Test Infrastructure (Fixture-Based)
 
-1. **Update handlers**: Test that updates return correct responses immediately
-2. **Continue-as-new**: Use positional args for explicit state passing
-3. **Time-skipping tests**: Use `asyncio.sleep()` after signals to allow processing
-4. **Class-based activities with Protocol DI**: Enables clean mocking and testing
+**All workflow tests use pytest fixtures from `tests/unit/conftest.py`:**
+
+```python
+# Standard test pattern
+class TestPlayerEntityWorkflow:
+    @pytest.mark.asyncio
+    async def test_something(
+        self, client: Client, worker: Worker
+    ) -> None:
+        handle = await client.start_workflow(...)
+
+        # CRITICAL: Allow workflow to initialize state
+        await asyncio.sleep(0.1)
+
+        # Test logic
+        result = await handle.query(...)
+```
+
+**Key Fixtures (conftest.py):**
+- `temporal_env` - Time-skipping WorkflowEnvironment
+- `client` - Client with pydantic_data_converter configured
+- `worker` - Worker with ThreadPoolExecutor and ALL workflows/activities registered
+- Mock activities: `MockQuestionsActivities`, `MockConfigActivities`, `MockEmailActivities`
+
+**CRITICAL: Mock activities MUST be synchronous (`def`) to match real activities:**
+```python
+# Correct pattern in conftest.py
+class MockQuestionsActivities:
+    @activity.defn(name="get_questions_for_day")
+    def get_questions_for_day(self, ...) -> list[Question]:  # def, not async def
+        return [test_questions]
+```
+
+### Critical Testing Patterns
+
+1. **Workflow initialization sleep**: `await asyncio.sleep(0.1)` after EVERY `start_workflow()` call
+2. **Update handlers**: Test that updates return correct responses immediately
+3. **Time-skipping tests**: Use WorkflowEnvironment.start_time_skipping() for deterministic time
+4. **Mock activities**: Must be synchronous to match real activity signatures
 5. **Defensive queries**: Return `.copy()` to prevent external mutation
-6. **Temporal test environment**: Reuse fixtures and setup patterns
+6. **ThreadPoolExecutor**: Automatically included via worker fixture for sync activities
 
 ### Test Organization
 
@@ -181,6 +216,7 @@ async def submit_answer(...) -> HTMLResponse:
 - **Integration tests** (`tests/integration/`): Full player journeys, multi-day flows, leaderboard aggregation
 - **End-to-end tests**: Complete event lifecycle with time-based transitions
 - **Test directories do NOT have `__init__.py`** files (prevents pytest import conflicts)
+- **Pytest fixtures** (`tests/unit/conftest.py`): Reusable WorkflowEnvironment, Client, Worker, mock activities
 
 Example test names:
 - `test_player_workflow_tracks_score()`
@@ -537,6 +573,48 @@ def test_load_event_config():
     assert isinstance(result, EventConfig)
 ```
 
+### Test Fixtures (`tests/unit/conftest.py`) 🔑 **NEW**
+
+**All workflow tests use pytest fixtures - never create WorkflowEnvironment/Worker manually!**
+
+The `conftest.py` file provides reusable fixtures for all workflow tests:
+
+```python
+# tests/unit/conftest.py structure
+
+# Mock Activity Classes (MUST be synchronous)
+class MockQuestionsActivities:
+    @activity.defn(name="get_questions_for_day")
+    def get_questions_for_day(self, ...) -> list[Question]:  # def, not async def
+
+class MockConfigActivities:
+    @activity.defn(name="load_event_config")
+    def load_event_config(self, ...) -> EventConfig:  # def, not async def
+
+# Fixtures
+@pytest_asyncio.fixture
+async def temporal_env() -> AsyncGenerator[WorkflowEnvironment]:
+    """Time-skipping test environment."""
+
+@pytest_asyncio.fixture
+async def client(temporal_env: WorkflowEnvironment) -> Client:
+    """Client with pydantic_data_converter configured."""
+
+@pytest_asyncio.fixture
+async def worker(...) -> AsyncGenerator[Worker]:
+    """Worker with ThreadPoolExecutor + ALL workflows/activities."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+        async with Worker(..., activity_executor=executor):
+            yield worker
+```
+
+**Key Points:**
+- Mock activities MUST be **synchronous (`def`)** to match real activities
+- `worker` fixture registers ALL 3 workflows and ALL 4 mock activities (catch-all pattern)
+- ThreadPoolExecutor automatically included (no manual setup needed)
+- pydantic_data_converter automatically configured in client fixture
+- Helper functions: `create_test_event_config()`, `create_test_questions()`
+
 ## Activities Implemented (Phase 2: 100% Complete)
 
 ### ConfigActivities (`src/activities/config.py`)
@@ -656,50 +734,43 @@ def test_load_event_config():
    - Must be used consistently (worker and client)
    - Without this, you'll get: `TypeError: Unserializable type during conversion`
 
-4. **Workflow Testing with WorkflowEnvironment** 🔑
+4. **Workflow Testing with Pytest Fixtures** 🔑 **UPDATED**
+
+   **All workflow tests use fixtures from `tests/unit/conftest.py` - DO NOT create WorkflowEnvironment/Worker manually!**
+
    ```python
-   from temporalio.testing import WorkflowEnvironment
-   from temporalio.worker import Worker
-   import concurrent.futures
-
-   async with await WorkflowEnvironment.start_time_skipping() as env:
-       # Configure client with pydantic converter
-       new_config = env.client.config()
-       new_config["data_converter"] = pydantic_data_converter
-       client = Client(**new_config)
-
-       # CRITICAL: Use ThreadPoolExecutor for synchronous activities
-       with concurrent.futures.ThreadPoolExecutor(max_workers=100) as activity_executor:
-           async with Worker(
-               client,
+   # Modern pattern (USE THIS)
+   class TestMyWorkflow:
+       @pytest.mark.asyncio
+       async def test_something(
+           self, client: Client, worker: Worker  # Fixtures from conftest.py
+       ) -> None:
+           handle = await client.start_workflow(
+               MyWorkflow.run,
+               args=["arg1", "arg2"],
+               id=f"test-workflow-{uuid.uuid4()}",
                task_queue="test-queue",
-               workflows=[MyWorkflow],
-               activities=[mock_activities.some_activity],
-               activity_executor=activity_executor,  # Required for sync activities!
-           ):
-               handle = await client.start_workflow(
-                   MyWorkflow.run,
-                   args=["arg1", "arg2"],
-                   id=f"test-workflow-{uuid.uuid4()}",
-                   task_queue="test-queue",
-               )
+           )
 
-               # CRITICAL: Allow workflow to initialize state before calling updates
-               await asyncio.sleep(0.1)
+           # CRITICAL: Allow workflow to initialize state
+           await asyncio.sleep(0.1)
 
-               # Now safe to call updates/queries
-               result = await handle.query(MyWorkflow.my_query)
+           # Now safe to call updates/queries
+           result = await handle.query(MyWorkflow.my_query)
    ```
-   - Use `WorkflowEnvironment.start_time_skipping()` for unit tests
-   - **CRITICAL**: Add `ThreadPoolExecutor` with `activity_executor` parameter for sync activities
-   - Without executor: "Activity X is not async so an activity_executor must be present" error
-   - Use `max_workers=100` for concurrent operations (e.g., multiple player registrations)
-   - **CRITICAL**: Add `await asyncio.sleep(0.1)` after starting workflow before calling updates
-   - Without sleep: "Workflow state not initialized" RuntimeError
-   - Allows time control for testing time-dependent logic
-   - Clean async context managers for setup/teardown
-   - Worker must be running to execute workflow
-   - Always use unique workflow IDs in tests
+
+   **Key Fixtures (all in conftest.py):**
+   - `temporal_env` - WorkflowEnvironment.start_time_skipping() wrapper
+   - `client` - Client with pydantic_data_converter pre-configured
+   - `worker` - Worker with ThreadPoolExecutor + ALL workflows/activities registered
+   - Mock activities: All available via worker fixture
+
+   **CRITICAL:**
+   - **ALWAYS use fixtures** - Never create WorkflowEnvironment/Worker/Client manually
+   - **ALWAYS add `await asyncio.sleep(0.1)`** after `start_workflow()`
+   - **Mock activities MUST be sync (`def`)** to match real activities
+   - ThreadPoolExecutor automatically included via worker fixture
+   - Unique workflow IDs required: `f"test-workflow-{uuid.uuid4()}"`
 
 5. **Data Model Placement** 🔑
    - **Place in `src/models/`** if:
@@ -716,13 +787,19 @@ def test_load_event_config():
 ### Workflow Testing Checklist
 
 Before writing a workflow test:
-- [ ] Import pydantic_data_converter from temporalio.contrib.pydantic
-- [ ] Configure client with pydantic converter in test setup
-- [ ] Use WorkflowEnvironment.start_time_skipping() for unit tests
-- [ ] Generate unique workflow IDs with uuid.uuid4()
+- [ ] Add fixture parameters: `self, client: Client, worker: Worker`
+- [ ] Use `await asyncio.sleep(0.1)` after `start_workflow()` for state initialization
+- [ ] Generate unique workflow IDs with `uuid.uuid4()`
 - [ ] Test queries return correct data types
 - [ ] Test state initialization (zero scores, empty sets)
-- [ ] Mock activities if workflow calls them (future steps)
+- [ ] Mock activities are defined in `conftest.py` (already available via worker fixture)
+
+**DO NOT:**
+- ❌ Create WorkflowEnvironment manually (use `temporal_env` fixture)
+- ❌ Configure pydantic converter manually (use `client` fixture)
+- ❌ Create Worker manually (use `worker` fixture)
+- ❌ Add ThreadPoolExecutor manually (included in `worker` fixture)
+- ❌ Make mock activities async (they MUST be sync to match real activities)
 
 ### Common Workflow Errors and Solutions
 
