@@ -125,12 +125,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 14: EventWorkflow - Basic Structure
-- [ ] Write EventWorkflow initialization tests
-- [ ] Implement EventWorkflow with basic structure
-- [ ] Add workflow.run method with config loading
-- [ ] Add workflow.query method (get_event_status)
-- [ ] Refactor with error handling for config loading
-- [ ] Verify tests pass and run just check
+- [x] Write EventWorkflow initialization tests
+- [x] Implement EventWorkflow with basic structure
+- [x] Add workflow.run method with config loading
+- [x] Add workflow.query method (get_event_status)
+- [x] Refactor with error handling for config loading
+- [x] Verify tests pass and run just check
 
 ### Step 15: EventWorkflow - Player Registration
 - [ ] Write register_player update handler tests (new player, duplicate, validation)
@@ -329,12 +329,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
-**Phase 3: Workflow Implementation** - 5/8 steps complete (62.5%)
+**Phase 3: Workflow Implementation** - 6/8 steps complete (75.0%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 13/35 steps complete (37.1%)**
+**Total Progress: 14/35 steps complete (40.0%)**
 
 ---
 

@@ -1,4 +1,4 @@
-# ABOUTME: Workflow state models for PlayerEntityWorkflow and DailyWorkflow.
+# ABOUTME: Workflow state models for PlayerEntityWorkflow, DailyWorkflow, and EventWorkflow.
 # Encapsulates all state needed by workflows for state management and persistence.
 
 from dataclasses import dataclass, field
@@ -83,3 +83,47 @@ class DailyState:
     completed_players: set[str] = field(default_factory=set)
     player_info: dict[str, tuple[str, str, str]] = field(default_factory=dict)
     config: EventConfig | None = None
+
+
+@dataclass
+class EventState:
+    """State for EventWorkflow managing the entire event lifecycle.
+
+    This dataclass encapsulates all state needed by EventWorkflow to manage
+    the entire event, including configuration, player registry, and tracking
+    of daily child workflows.
+
+    Attributes:
+        event_id: Unique identifier for this event.
+        config: Event configuration loaded from TOML file.
+        daily_workflow_ids: Mapping of date strings to DailyWorkflow workflow IDs.
+        player_count: Total number of registered players.
+        player_registry: Mapping of email to player_id for duplicate detection.
+
+    Example:
+        >>> from datetime import date, time
+        >>> config = EventConfig(
+        ...     start_date=date(2025, 3, 10),
+        ...     end_date=date(2025, 3, 12),
+        ...     day_start_time=time(9, 0),
+        ...     day_end_time=time(17, 0),
+        ...     timezone="America/Los_Angeles",
+        ...     questions_file_path="config/questions.json",
+        ...     questions_per_day=5,
+        ...     show_correct_answer=True,
+        ...     require_work_email=False,
+        ...     s3_bucket_name="test-bucket",
+        ...     s3_region="us-west-2"
+        ... )
+        >>> state = EventState(event_id="my-event", config=config)
+        >>> state.player_count
+        0
+        >>> state.player_registry
+        {}
+    """
+
+    event_id: str
+    config: EventConfig
+    daily_workflow_ids: dict[str, str] = field(default_factory=dict)
+    player_count: int = 0
+    player_registry: dict[str, str] = field(default_factory=dict)

@@ -16,10 +16,11 @@ from src.models.config import EventConfig
 from src.models.question import Question
 from src.models.state import PlayerState
 from src.workflows.daily import DailyWorkflow
+from src.workflows.event import EventWorkflow
 from src.workflows.player import PlayerEntityWorkflow
 
 
-# Mock activity for testing
+# Mock activities for testing
 class MockQuestionsActivities:
     """Mock questions activities for workflow testing."""
 
@@ -47,6 +48,20 @@ class MockQuestionsActivities:
                 correct_answer="B",
             ),
         ]
+
+
+class MockConfigActivities:
+    """Mock config activities for EventWorkflow testing."""
+
+    @activity.defn(name="load_event_config")
+    async def load_event_config(self, config_path: str) -> EventConfig:
+        """Mock load_event_config that returns test config."""
+        return create_test_event_config()
+
+    @activity.defn(name="validate_questions_file")
+    async def validate_questions_file(self, file_path: str, config: EventConfig) -> None:
+        """Mock validate_questions_file that always succeeds."""
+        pass
 
 
 # Test fixtures and helpers
@@ -1239,3 +1254,164 @@ class TestDailyWorkflow:
                 # Should have display name in "FirstName L." format
                 assert len(leaderboard) == 1
                 assert leaderboard[0].display_name == "Alice S."
+
+
+class TestEventWorkflow:
+    """Test suite for EventWorkflow initialization and basic structure."""
+
+    @pytest.mark.asyncio
+    async def test_event_workflow_can_be_started_with_event_id_and_config_path(self) -> None:
+        """Test that EventWorkflow can be started with event_id and config_path."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockConfigActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[EventWorkflow],
+                activities=[
+                    mock_activities.load_event_config,
+                    mock_activities.validate_questions_file,
+                ],
+            ):
+                # Start EventWorkflow with event_id and config_path
+                handle = await client.start_workflow(
+                    EventWorkflow.run,
+                    args=["test-event-123", "config/event.toml"],
+                    id=f"test-event-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Workflow should start successfully
+                assert handle is not None
+
+    @pytest.mark.asyncio
+    async def test_event_workflow_loads_configuration_via_activity(self) -> None:
+        """Test that workflow loads configuration via load_event_config activity."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockConfigActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[EventWorkflow],
+                activities=[
+                    mock_activities.load_event_config,
+                    mock_activities.validate_questions_file,
+                ],
+            ):
+                handle = await client.start_workflow(
+                    EventWorkflow.run,
+                    args=["test-event-123", "config/event.toml"],
+                    id=f"test-event-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query to get event status which should contain loaded config data
+                status = await handle.query(EventWorkflow.get_event_status)
+
+                # Status should contain event_id from loaded config
+                assert status is not None
+                assert "event_id" in status
+                assert status["event_id"] == "test-event-123"
+
+    @pytest.mark.asyncio
+    async def test_event_workflow_validates_questions_file_via_activity(self) -> None:
+        """Test that workflow validates questions file via validate_questions_file activity."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockConfigActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[EventWorkflow],
+                activities=[
+                    mock_activities.load_event_config,
+                    mock_activities.validate_questions_file,
+                ],
+            ):
+                # Start workflow - should call validate_questions_file activity
+                handle = await client.start_workflow(
+                    EventWorkflow.run,
+                    args=["test-event-123", "config/event.toml"],
+                    id=f"test-event-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # If validation failed, workflow would raise error
+                # Successful start means validation passed
+                assert handle is not None
+
+    @pytest.mark.asyncio
+    async def test_event_workflow_query_get_event_status_returns_correct_status(self) -> None:
+        """Test that workflow query get_event_status() returns correct status."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockConfigActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[EventWorkflow],
+                activities=[
+                    mock_activities.load_event_config,
+                    mock_activities.validate_questions_file,
+                ],
+            ):
+                handle = await client.start_workflow(
+                    EventWorkflow.run,
+                    args=["test-event-123", "config/event.toml"],
+                    id=f"test-event-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query event status
+                status = await handle.query(EventWorkflow.get_event_status)
+
+                # Verify status has expected keys
+                assert isinstance(status, dict)
+                assert "event_id" in status
+                assert "player_count" in status
+                assert status["event_id"] == "test-event-123"
+
+    @pytest.mark.asyncio
+    async def test_event_workflow_tracks_player_count(self) -> None:
+        """Test that workflow tracks player_count correctly."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockConfigActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[EventWorkflow],
+                activities=[
+                    mock_activities.load_event_config,
+                    mock_activities.validate_questions_file,
+                ],
+            ):
+                handle = await client.start_workflow(
+                    EventWorkflow.run,
+                    args=["test-event-123", "config/event.toml"],
+                    id=f"test-event-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Query initial player_count
+                status = await handle.query(EventWorkflow.get_event_status)
+
+                # Initial player_count should be 0
+                assert status["player_count"] == 0

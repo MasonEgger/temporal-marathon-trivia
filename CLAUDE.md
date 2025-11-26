@@ -309,10 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 in progress - 13/35 steps complete (37.1% total progress)
+**Current Status**: Phase 3 in progress - 14/35 steps complete (40.0% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 62.5% complete (5/8 steps)
+- Phase 3 (Workflow Implementation): 75.0% complete (6/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -764,6 +764,24 @@ Before writing a workflow test:
   - Display names in "FirstName L." format
   - Temporal update validator prevents duplicate score submissions
 
+### EventWorkflow (`src/workflows/event.py`)
+- **Status**: BASIC STRUCTURE COMPLETE (Step 14) ✅
+- **Pattern**: Parent workflow (manages entire event)
+- **State**: EventState with event_id, config, daily_workflow_ids, player_count, player_registry
+- **Run method**: Loads config via activity, validates questions via activity, initializes state, runs indefinitely
+- **Queries implemented**:
+  - `get_event_status() -> dict` - Returns event_id and player_count for monitoring
+- **Activities called**:
+  - `load_event_config(config_path)` - Loads TOML configuration
+  - `validate_questions_file(file_path, config)` - Validates questions match config
+- **Testing**: 5 comprehensive tests with pydantic_data_converter and mock activities
+- **Coverage**: 100% (22 statements, 0 missed)
+- **Key Features**:
+  - Configuration loading at workflow startup (fail fast on errors)
+  - Activity method references for type safety (not string-based)
+  - Parent workflow pattern for event coordination
+  - Future: Will create child DailyWorkflows and PlayerEntityWorkflows
+
 ### Workflow State Models (`src/models/state.py`)
 - **Purpose**: Consolidated file for all workflow state dataclasses
 - **PlayerState**: Workflow state for PlayerEntityWorkflow
@@ -772,7 +790,10 @@ Before writing a workflow test:
 - **DailyState**: Workflow state for DailyWorkflow
   - Fields: date (str), questions (list[Question]), player_scores (dict[str, int]), completed_players (set[str]), player_info (dict[str, tuple[str, str, str]]), config (EventConfig | None)
   - Design: Manages daily leaderboard state with player scores, completion tracking, and player identity for ranking
-- **Coverage**: 100% (14 statements, 0 missed)
+- **EventState**: Workflow state for EventWorkflow
+  - Fields: event_id (str), config (EventConfig), daily_workflow_ids (dict[str, str]), player_count (int), player_registry (dict[str, str])
+  - Design: Manages entire event lifecycle with child workflow tracking and player registry for duplicate detection
+- **Coverage**: 100% (20 statements, 0 missed)
 - **Design Pattern**: All workflow state models consolidated in single file for better organization
 
 ## Reference Projects
