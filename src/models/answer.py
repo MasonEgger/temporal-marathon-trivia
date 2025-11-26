@@ -114,3 +114,31 @@ class SubmitScoreRequest:
     email: str
     first_name: str
     last_name: str
+
+
+@dataclass
+class RegisterPlayerRequest:
+    """Request model for register_player update handler in EventWorkflow.
+
+    Encapsulates all parameters needed to register a new player,
+    maintaining type safety when passing to workflow update handlers.
+
+    Attributes:
+        email: Player's email address (used for duplicate detection)
+        first_name: Player's first name
+        last_name: Player's last name
+
+    Example:
+        >>> request = RegisterPlayerRequest(
+        ...     email="john.doe@company.com",
+        ...     first_name="John",
+        ...     last_name="Doe"
+        ... )
+        >>> player_id = await handle.execute_update(
+        ...     EventWorkflow.register_player, request
+        ... )
+    """
+
+    email: str
+    first_name: str
+    last_name: str

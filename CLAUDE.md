@@ -309,10 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 in progress - 14/35 steps complete (40.0% total progress)
+**Current Status**: Phase 3 in progress - 15/35 steps complete (42.9% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 75.0% complete (6/8 steps)
+- Phase 3 (Workflow Implementation): 87.5% complete (7/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -660,6 +660,7 @@ def test_load_event_config():
    ```python
    from temporalio.testing import WorkflowEnvironment
    from temporalio.worker import Worker
+   import concurrent.futures
 
    async with await WorkflowEnvironment.start_time_skipping() as env:
        # Configure client with pydantic converter
@@ -667,17 +668,34 @@ def test_load_event_config():
        new_config["data_converter"] = pydantic_data_converter
        client = Client(**new_config)
 
-       async with Worker(client, task_queue="test-queue", workflows=[MyWorkflow]):
-           handle = await client.start_workflow(
-               MyWorkflow.run,
-               args=["arg1", "arg2"],
-               id=f"test-workflow-{uuid.uuid4()}",
+       # CRITICAL: Use ThreadPoolExecutor for synchronous activities
+       with concurrent.futures.ThreadPoolExecutor(max_workers=100) as activity_executor:
+           async with Worker(
+               client,
                task_queue="test-queue",
-           )
-           # Query the workflow
-           result = await handle.query(MyWorkflow.my_query)
+               workflows=[MyWorkflow],
+               activities=[mock_activities.some_activity],
+               activity_executor=activity_executor,  # Required for sync activities!
+           ):
+               handle = await client.start_workflow(
+                   MyWorkflow.run,
+                   args=["arg1", "arg2"],
+                   id=f"test-workflow-{uuid.uuid4()}",
+                   task_queue="test-queue",
+               )
+
+               # CRITICAL: Allow workflow to initialize state before calling updates
+               await asyncio.sleep(0.1)
+
+               # Now safe to call updates/queries
+               result = await handle.query(MyWorkflow.my_query)
    ```
    - Use `WorkflowEnvironment.start_time_skipping()` for unit tests
+   - **CRITICAL**: Add `ThreadPoolExecutor` with `activity_executor` parameter for sync activities
+   - Without executor: "Activity X is not async so an activity_executor must be present" error
+   - Use `max_workers=100` for concurrent operations (e.g., multiple player registrations)
+   - **CRITICAL**: Add `await asyncio.sleep(0.1)` after starting workflow before calling updates
+   - Without sleep: "Workflow state not initialized" RuntimeError
    - Allows time control for testing time-dependent logic
    - Clean async context managers for setup/teardown
    - Worker must be running to execute workflow
@@ -723,7 +741,7 @@ Before writing a workflow test:
    - **Solution**: Return defensive copies from queries
    - **Pattern**: Use `dict()`, `set()` to copy mutable collections
 
-## Workflows Implemented (Phase 3: 50% Complete)
+## Workflows Implemented (Phase 3: 87.5% Complete)
 
 ### PlayerEntityWorkflow (`src/workflows/player.py`)
 - **Status**: COMPLETE - All core functionality implemented (Steps 9-11) ✅
@@ -765,22 +783,28 @@ Before writing a workflow test:
   - Temporal update validator prevents duplicate score submissions
 
 ### EventWorkflow (`src/workflows/event.py`)
-- **Status**: BASIC STRUCTURE COMPLETE (Step 14) ✅
+- **Status**: PLAYER REGISTRATION COMPLETE (Steps 14-15) ✅
 - **Pattern**: Parent workflow (manages entire event)
 - **State**: EventState with event_id, config, daily_workflow_ids, player_count, player_registry
 - **Run method**: Loads config via activity, validates questions via activity, initializes state, runs indefinitely
 - **Queries implemented**:
   - `get_event_status() -> dict` - Returns event_id and player_count for monitoring
+  - `get_player_id_by_email(email: str) -> str | None` - Lookup player by email
+- **Update handlers implemented**:
+  - `register_player(request: RegisterPlayerRequest) -> str` - Creates PlayerEntityWorkflow child, validates email, handles duplicates
 - **Activities called**:
   - `load_event_config(config_path)` - Loads TOML configuration
   - `validate_questions_file(file_path, config)` - Validates questions match config
-- **Testing**: 5 comprehensive tests with pydantic_data_converter and mock activities
-- **Coverage**: 100% (22 statements, 0 missed)
+  - `validate_email(email, require_work_email)` - Validates email format and work domain
+- **Testing**: 11 comprehensive tests with pydantic_data_converter, mock activities, and ThreadPoolExecutor
+- **Coverage**: 91.30% (44 statements, 4 missed)
 - **Key Features**:
   - Configuration loading at workflow startup (fail fast on errors)
+  - Player registration with child workflow creation
+  - Email validation and duplicate detection
+  - Player registry for email → player_id mapping
   - Activity method references for type safety (not string-based)
   - Parent workflow pattern for event coordination
-  - Future: Will create child DailyWorkflows and PlayerEntityWorkflows
 
 ### Workflow State Models (`src/models/state.py`)
 - **Purpose**: Consolidated file for all workflow state dataclasses
@@ -1019,3 +1043,76 @@ This project reuses patterns from:
    - Extract time component with `.time()` for time-of-day comparisons
    - Enables proper replay and testing with time-skipping
    - Critical for time-based access control in DailyWorkflow
+
+10. **Child Workflow Creation** 🔑🔑🔑 **CRITICAL**
+    ```python
+    # WRONG - workflow.uuid4() returns UUID object
+    player_id = workflow.uuid4()
+    await workflow.start_child_workflow(..., id=player_id)  # TypeError!
+
+    # CORRECT - Convert UUID to string
+    player_id = str(workflow.uuid4())
+    await workflow.start_child_workflow(
+        PlayerEntityWorkflow.run,
+        args=[player_id, email, first_name, last_name],
+        id=player_id,  # Must be string!
+        task_queue=workflow.info().task_queue,
+    )
+    ```
+    - **workflow.uuid4() returns UUID object, NOT string** - ALWAYS convert with `str()`
+    - Failure mode: TypeError "bad argument type for built-in operation"
+    - Manifests as hanging test with retries
+    - **Await `start_child_workflow()` to initiate**, but don't await the handle for indefinite workflows
+    - Child workflow ID must be string for idempotency
+    - Use `workflow.info().task_queue` to use same queue as parent
+    - From Step 15: This is the #1 gotcha for child workflow creation
+
+11. **ThreadPoolExecutor for Synchronous Activities in Tests** 🔑🔑 **CRITICAL**
+    ```python
+    import concurrent.futures
+
+    # When testing workflows that call synchronous activities
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as activity_executor:
+        async with Worker(
+            client,
+            task_queue="test-queue",
+            workflows=[EventWorkflow, PlayerEntityWorkflow],
+            activities=[
+                mock_config_activities.load_event_config,  # async
+                mock_email_activities.validate_email,  # async mock of sync real
+            ],
+            activity_executor=activity_executor,  # REQUIRED!
+        ):
+            # Test code
+    ```
+    - **REQUIRED when ANY activity is synchronous** (even if mock is async)
+    - Error without it: "Activity X is not async so an activity_executor must be present"
+    - Use `max_workers=100` for concurrent player registration scenarios
+    - Wrap Worker creation with ThreadPoolExecutor context manager
+    - Mock activities can be async for test simplicity, but executor still needed
+    - From Step 15: This pattern required for ALL tests with sync activities
+
+12. **Workflow Initialization Timing in Tests** 🔑🔑 **CRITICAL**
+    ```python
+    handle = await client.start_workflow(
+        EventWorkflow.run,
+        args=["event-id", "config/event.toml"],
+        id=f"test-workflow-{uuid.uuid4()}",
+        task_queue="test-queue",
+    )
+
+    # CRITICAL: Allow workflow run method to initialize self.state
+    await asyncio.sleep(0.1)
+
+    # Now safe to call update handlers
+    result = await handle.execute_update(
+        EventWorkflow.register_player,
+        RegisterPlayerRequest(...)
+    )
+    ```
+    - Workflow run method initializes `self.state` asynchronously
+    - Update handlers check `if self.state is None: raise RuntimeError(...)`
+    - Without sleep: "Workflow state not initialized" RuntimeError with infinite retries
+    - 0.1 seconds sufficient for test environment
+    - **Required for ALL update handlers on newly started workflows**
+    - From Step 15: Critical pattern discovered through debugging hanging tests

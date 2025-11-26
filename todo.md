@@ -133,11 +133,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 15: EventWorkflow - Player Registration
-- [ ] Write register_player update handler tests (new player, duplicate, validation)
-- [ ] Implement register_player update handler
-- [ ] Add child workflow creation for PlayerEntityWorkflow
-- [ ] Refactor with player lookup helper
-- [ ] Verify tests pass and run just check
+- [x] Write register_player update handler tests (new player, duplicate, validation)
+- [x] Implement register_player update handler
+- [x] Add child workflow creation for PlayerEntityWorkflow
+- [x] Refactor with player lookup helper
+- [x] Verify tests pass and run just check
 
 ### Step 16: EventWorkflow - Daily Workflow Scheduling
 - [ ] Write daily workflow scheduling tests
@@ -329,12 +329,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
-**Phase 3: Workflow Implementation** - 6/8 steps complete (75.0%)
+**Phase 3: Workflow Implementation** - 7/8 steps complete (87.5%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 14/35 steps complete (40.0%)**
+**Total Progress: 15/35 steps complete (42.9%)**
 
 ---
 

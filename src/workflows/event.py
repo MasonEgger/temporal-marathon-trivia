@@ -4,10 +4,14 @@
 from datetime import timedelta
 
 from temporalio import workflow
+from temporalio.exceptions import ApplicationError
 
 from src.activities.config import ConfigActivities
+from src.activities.email import EmailActivities
 from src.activities.questions import QuestionsActivities
+from src.models.answer import RegisterPlayerRequest
 from src.models.state import EventState
+from src.workflows.player import PlayerEntityWorkflow
 
 
 @workflow.defn
@@ -117,3 +121,100 @@ class EventWorkflow:
             "event_id": self.state.event_id,
             "player_count": self.state.player_count,
         }
+
+    @workflow.update
+    async def register_player(self, request: RegisterPlayerRequest) -> str:
+        """Register a new player and create PlayerEntityWorkflow instance.
+
+        This update handler validates the email, checks for duplicates, and creates
+        a child PlayerEntityWorkflow for the player. If the email already exists,
+        returns the existing player_id without creating a new workflow.
+
+        Args:
+            request: RegisterPlayerRequest containing email, first_name, last_name
+
+        Returns:
+            player_id: UUID string identifying the player's workflow.
+
+        Raises:
+            RuntimeError: If workflow state is not initialized.
+            ApplicationError: If email validation fails.
+
+        Example:
+            >>> request = RegisterPlayerRequest(
+            ...     email="john.doe@company.com",
+            ...     first_name="John",
+            ...     last_name="Doe"
+            ... )
+            >>> player_id = await handle.execute_update(
+            ...     EventWorkflow.register_player, request
+            ... )
+            >>> print(f"Registered player: {player_id}")
+            Registered player: 550e8400-e29b-41d4-a716-446655440000
+        """
+        if self.state is None:
+            raise RuntimeError("Workflow state not initialized")
+
+        # Check if email already registered (handle duplicates)
+        if request.email in self.state.player_registry:
+            # Return existing player_id for duplicate email
+            return self.state.player_registry[request.email]
+
+        # Validate email via activity
+        email_activities = EmailActivities()
+        is_valid = await workflow.execute_activity_method(
+            email_activities.validate_email,
+            args=[request.email, self.state.config.require_work_email],
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+        # Raise ApplicationError if email is invalid
+        if not is_valid:
+            raise ApplicationError(f"Invalid email address: {request.email}")
+
+        # Generate new player_id using workflow.uuid4()
+        player_id = str(workflow.uuid4())
+
+        # Start PlayerEntityWorkflow as child workflow
+        # Await the start but don't await the handle (runs indefinitely)
+        await workflow.start_child_workflow(
+            PlayerEntityWorkflow.run,
+            args=[player_id, request.email, request.first_name, request.last_name],
+            id=player_id,  # Use player_id as workflow_id for idempotency
+            task_queue=workflow.info().task_queue,
+        )
+
+        # Store email -> player_id mapping in registry
+        self.state.player_registry[request.email] = player_id
+
+        # Increment player_count
+        self.state.player_count += 1
+
+        # Return player_id
+        return player_id
+
+    @workflow.query
+    def get_player_id_by_email(self, email: str) -> str | None:
+        """Query to get player_id by email address.
+
+        Returns the player_id if the email is registered, otherwise None.
+        This is useful for looking up existing players by email.
+
+        Args:
+            email: Email address to look up
+
+        Returns:
+            player_id if email is registered, None otherwise
+
+        Example:
+            >>> player_id = await handle.query(
+            ...     EventWorkflow.get_player_id_by_email,
+            ...     "john.doe@company.com"
+            ... )
+            >>> if player_id:
+            ...     print(f"Found player: {player_id}")
+        """
+        if self.state is None:
+            raise RuntimeError("Workflow state not initialized")
+
+        return self.state.player_registry.get(email)
