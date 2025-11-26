@@ -345,11 +345,11 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 4 in progress - 18/35 steps complete (51.4% total progress)
+**Current Status**: Phase 4 in progress - 19/35 steps complete (54.3% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
-- Phase 4 (API Layer): 33.3% complete (2/6 steps)
+- Phase 4 (API Layer): 50.0% complete (3/6 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -899,6 +899,35 @@ Before writing a workflow test:
 - **Coverage**: 100% (24 statements, 0 missed)
 - **Design Pattern**: Unit tests mock Temporal to test OUR orchestration logic only
 
+### Gameplay Routes (`src/api/routes/gameplay.py`)
+- **Status**: COMPLETE - Start day endpoint (Step 19) ✅
+- **Endpoint**: `GET /api/day/{date}/start` - Starts a player's daily trivia session
+- **Pattern**: Calls PlayerEntityWorkflow.start_day via Temporal client
+- **Response**: HTML fragment with first question (question.html)
+- **Cookie Validation**: Manual validation (`Cookie(None)` + check) for HTMX compatibility
+  - Returns 200 + error HTML instead of 422 validation error
+  - Better UX: Error HTML swaps seamlessly into HTMX target
+  - Makes cookie validation testable application logic
+- **Error Handling**:
+  - Missing cookie: Returns error HTML "Please register first"
+  - ApplicationError for workflow validation (day not started, ended, already completed, invalid date)
+  - Generic Exception for unexpected errors
+- **Templates**:
+  - `frontend/templates/components/question.html` - Question display with HTMX form
+    - Question number and text
+    - 4 radio button options (A/B/C/D)
+    - HTMX form: `hx-post="/api/day/{date}/answer" hx-target="#main"`
+    - Hidden question_id field
+- **Testing**: 7 unit tests focusing on application logic:
+  - Returns HTML fragment with question
+  - Requires player_id cookie (manual validation)
+  - Validates day has started/ended
+  - Validates player hasn't completed day
+  - Invalid date handling
+  - Unexpected exception handling
+- **Coverage**: 100% (21 statements, 0 missed)
+- **Design Pattern**: Manual cookie validation for HTMX (200 + error HTML > 422)
+
 ### Testing Philosophy for API Layer 🔑 **CRITICAL**
 
 From Steps 17-18 implementation - key lessons learned:
@@ -970,6 +999,48 @@ def test_health_endpoint_returns_ok():
 ```
 
 **Rationale**: Infrastructure code (connections, env vars, client initialization) has zero application logic. Testing it = testing that libraries work.
+
+### Manual Cookie Validation for HTMX (Step 19) 🔑
+
+**Problem**: FastAPI's `Cookie(...)` required parameter returns 422 validation error when cookie is missing, but HTMX expects 200 + HTML fragments for seamless UI updates.
+
+**Solution**: Manual cookie validation pattern
+```python
+# Use Cookie(None) and manually validate
+@router.get("/api/day/{date}/start")
+async def start_day(
+    request: Request,
+    date: str = Path(),
+    player_id: str | None = Cookie(None),  # Optional for manual check
+) -> HTMLResponse:
+    # Manual validation (OUR application logic)
+    if not player_id:
+        return templates.TemplateResponse(
+            "components/error.html",
+            context={"request": request, "error": "Please register first"},
+        )
+    # Continue with validated player_id...
+```
+
+**Why This Works**:
+- Returns 200 + error HTML (HTMX-friendly) instead of 422 validation error
+- Error HTML swaps seamlessly into HTMX target element
+- Makes cookie validation testable as OUR application logic (not framework behavior)
+- Consistent with HTMX pattern: all responses are 200 + HTML fragments
+- Better user experience: graceful error display without page refresh
+
+**Testing Pattern**:
+```python
+def test_requires_player_id_cookie():
+    # Request WITHOUT cookie
+    response = client.get("/api/day/2025-03-10/start")
+
+    # OUR decision to return 200 + error HTML
+    assert response.status_code == 200
+    assert "error" in response.text.lower()
+```
+
+**From Step 19**: This architectural decision emerged from analyzing two approaches (FastAPI validation vs manual) and choosing the one that best supports HTMX's HTML fragment model.
 
 ## Workflows Implemented (Phase 3: 100% Complete)
 

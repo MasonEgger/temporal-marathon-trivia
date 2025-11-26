@@ -162,3 +162,213 @@ class TestPlayerRegistration:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "error" in response.text.lower()
+
+
+class TestGameplayStartDay:
+    """Tests for GET /api/day/{date}/start endpoint.
+
+    These are UNIT tests focused on application logic only.
+    Tests endpoint configuration, cookie validation, error handling, and template selection.
+    """
+
+    def test_start_day_returns_html_fragment_with_question(self) -> None:
+        """Test that GET /api/day/{date}/start returns HTML fragment with first question.
+
+        This tests OUR application logic - that we return HTML (not JSON) with question data.
+        """
+        from src.api.main import app
+        from src.models.question import Question
+
+        # Mock Temporal client
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        # Mock start_day returning first question
+        mock_question = Question(
+            id="q1",
+            text="What is 2+2?",
+            options={"A": "3", "B": "4", "C": "5", "D": "6"},
+            correct_answer="B",
+        )
+        mock_handle.execute_update = AsyncMock(return_value=mock_question)
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/day/2025-03-10/start",
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR response format (HTML fragment)
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Verify question data is in response (our template rendering)
+        assert "What is 2+2?" in response.text
+
+    def test_start_day_requires_player_id_cookie(self) -> None:
+        """Test that endpoint requires player_id cookie.
+
+        This tests OUR application logic - cookie validation requirement.
+        """
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        # Request WITHOUT player_id cookie
+        response = client.get("/api/day/2025-03-10/start")
+
+        # Verify OUR validation logic returns error
+        assert response.status_code == 200  # HTMX pattern: return 200 with error HTML
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_start_day_validates_day_has_started(self) -> None:
+        """Test that endpoint validates day has started.
+
+        This tests OUR application logic - handling workflow validation errors for early access.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        # Simulate workflow rejecting because day hasn't started
+        mock_handle.execute_update = AsyncMock(
+            side_effect=ApplicationError("Day has not started yet")
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/day/2025-03-10/start",
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR error handling returns appropriate message
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_start_day_validates_day_hasnt_ended(self) -> None:
+        """Test that endpoint validates day hasn't ended.
+
+        This tests OUR application logic - handling workflow validation errors for late access.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        # Simulate workflow rejecting because day has ended
+        mock_handle.execute_update = AsyncMock(
+            side_effect=ApplicationError("Day has already ended")
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/day/2025-03-10/start",
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR error handling returns appropriate message
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_start_day_validates_player_hasnt_completed_day(self) -> None:
+        """Test that endpoint validates player hasn't completed day.
+
+        This tests OUR application logic - handling workflow validation errors
+        for duplicate attempts.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        # Simulate workflow rejecting because day already completed
+        mock_handle.execute_update = AsyncMock(
+            side_effect=ApplicationError("Day already completed")
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/day/2025-03-10/start",
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR error handling returns appropriate message
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_start_day_returns_error_html_for_invalid_date(self) -> None:
+        """Test that endpoint returns error HTML for invalid date.
+
+        This tests OUR application logic - handling workflow validation errors for invalid dates.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        # Simulate workflow rejecting invalid date format
+        mock_handle.execute_update = AsyncMock(
+            side_effect=ApplicationError("Invalid date format")
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/day/invalid-date/start",
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR error handling returns appropriate message
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_start_day_handles_unexpected_exceptions(self) -> None:
+        """Test that unexpected exceptions return generic error HTML.
+
+        This tests OUR application logic - fallback error handling for unexpected errors.
+        """
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        # Simulate unexpected error (e.g., network issue)
+        mock_client.get_workflow_handle = MagicMock(
+            side_effect=RuntimeError("Connection timeout")
+        )
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/day/2025-03-10/start",
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR fallback error handling
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()

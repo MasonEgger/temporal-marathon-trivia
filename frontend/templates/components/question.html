@@ -1,0 +1,37 @@
+<div class="question-container">
+    <div class="question-header">
+        <span class="question-number">Question {{ question_number }}</span>
+    </div>
+
+    <div class="question-text">
+        {{ question.text }}
+    </div>
+
+    <form hx-post="/api/day/{{ date }}/answer" hx-target="#main">
+        <input type="hidden" name="question_id" value="{{ question.id }}">
+
+        <div class="options">
+            <label class="option">
+                <input type="radio" name="answer_choice" value="A" required>
+                <span>A: {{ question.options['A'] }}</span>
+            </label>
+
+            <label class="option">
+                <input type="radio" name="answer_choice" value="B" required>
+                <span>B: {{ question.options['B'] }}</span>
+            </label>
+
+            <label class="option">
+                <input type="radio" name="answer_choice" value="C" required>
+                <span>C: {{ question.options['C'] }}</span>
+            </label>
+
+            <label class="option">
+                <input type="radio" name="answer_choice" value="D" required>
+                <span>D: {{ question.options['D'] }}</span>
+            </label>
+        </div>
+
+        <button type="submit" class="submit-button">Submit Answer</button>
+    </form>
+</div>

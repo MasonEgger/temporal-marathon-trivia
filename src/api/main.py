@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from redis.asyncio import from_url
 from temporalio.client import Client
 
-from src.api.routes import player
+from src.api.routes import gameplay, player
 
 
 @asynccontextmanager
@@ -56,6 +56,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(player.router)
+app.include_router(gameplay.router)
 
 
 @app.get("/health")
