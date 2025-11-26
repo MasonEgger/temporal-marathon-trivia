@@ -5,11 +5,12 @@ import uuid
 
 import pytest
 from temporalio import activity
-from temporalio.client import Client
+from temporalio.client import Client, WorkflowUpdateFailedError
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from src.models.answer import AnswerResult, SubmitAnswerRequest
 from src.models.player import PlayerState
 from src.models.question import Question
 from src.workflows.player import PlayerEntityWorkflow
@@ -285,8 +286,45 @@ class TestPlayerEntityWorkflowStartDay:
 
     @pytest.mark.asyncio
     async def test_start_day_raises_error_if_day_already_completed(self) -> None:
-        """Test that start_day raises ValueError if day is already completed."""
-        pytest.skip("RED phase - requires workflow modification to mark day complete")
+        """Test that start_day raises error if day is already completed."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day and complete all questions
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+                )
+
+                # Try to start the same day again - should raise error
+                with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                    await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+                assert "already completed" in str(exc_info.value.cause).lower()
 
     @pytest.mark.asyncio
     async def test_start_day_calls_get_questions_for_day_activity(self) -> None:
@@ -353,3 +391,412 @@ class TestPlayerEntityWorkflowStartDay:
                 assert hasattr(result, "correct_answer")
                 assert len(result.options) == 4
                 assert set(result.options.keys()) == {"A", "B", "C", "D"}
+
+
+class TestPlayerEntityWorkflowSubmitAnswer:
+    """Test suite for PlayerEntityWorkflow submit_answer update handler."""
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_with_correct_answer_increments_score(self) -> None:
+        """Test that submit_answer with correct answer increments daily and total score."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day first
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Submit correct answer (question q1, correct answer is "B")
+                request = SubmitAnswerRequest(
+                    date="2025-03-10",
+                    question_id="q1",
+                    answer_choice="B",  # correct
+                    show_correct_answer=False,
+                )
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer, request
+                )
+
+                # Verify result
+                assert isinstance(result, AnswerResult)
+                assert result.is_correct is True
+
+                # Verify score updated
+                state = await handle.query(PlayerEntityWorkflow.get_current_state)
+                assert state.player.daily_scores.get("2025-03-10", 0) == 1
+                assert state.player.total_score == 1
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_with_incorrect_answer_does_not_increment_score(self) -> None:
+        """Test that submit_answer with incorrect answer does not increment score."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Submit incorrect answer (question q1, correct answer is "B", submit "A")
+                request = SubmitAnswerRequest(
+                    date="2025-03-10",
+                    question_id="q1",
+                    answer_choice="A",  # incorrect
+                    show_correct_answer=False,
+                )
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer, request
+                )
+
+                # Verify result
+                assert isinstance(result, AnswerResult)
+                assert result.is_correct is False
+
+                # Verify score NOT updated
+                state = await handle.query(PlayerEntityWorkflow.get_current_state)
+                assert state.player.daily_scores.get("2025-03-10", 0) == 0
+                assert state.player.total_score == 0
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_returns_next_question_if_more_remain(self) -> None:
+        """Test that submit_answer returns next question if more questions remain."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Submit answer to first question
+                request = SubmitAnswerRequest(
+                    date="2025-03-10",
+                    question_id="q1",
+                    answer_choice="B",
+                    show_correct_answer=False,
+                )
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer, request
+                )
+
+                # Should return next question (q2)
+                assert result.next_question is not None
+                assert result.next_question.id == "q2"
+                assert result.completion_message is None
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_returns_completion_message_if_all_questions_answered(
+        self,
+    ) -> None:
+        """Test that submit_answer returns completion message after last question."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Answer first two questions
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+                )
+
+                # Answer last question
+                result = await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+                )
+
+                # Should return completion message, no next question
+                assert result.next_question is None
+                assert result.completion_message is not None
+                assert isinstance(result.completion_message, str)
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_validates_answer_choice_is_valid(self) -> None:
+        """Test that submit_answer validates answer_choice is one of A, B, C, D."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Submit with invalid answer choice should raise error
+                with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                    await handle.execute_update(
+                        PlayerEntityWorkflow.submit_answer,
+                        SubmitAnswerRequest("2025-03-10", "q1", "E", False),
+                    )
+                assert "answer_choice" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_raises_error_if_question_id_does_not_match(self) -> None:
+        """Test that submit_answer raises error if question_id doesn't match current question."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day (current question is q1)
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Submit with wrong question_id should raise error
+                with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                    await handle.execute_update(
+                        PlayerEntityWorkflow.submit_answer,
+                        SubmitAnswerRequest("2025-03-10", "q999", "B", False),
+                    )
+                assert "question" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_raises_error_if_day_not_started(self) -> None:
+        """Test that submit_answer raises ValueError if day hasn't been started yet."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Don't start day, try to submit answer
+                with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                    await handle.execute_update(
+                        PlayerEntityWorkflow.submit_answer,
+                        SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                    )
+                assert "not started" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_raises_error_if_day_already_completed(self) -> None:
+        """Test that submit_answer raises ValueError if day is already completed."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day and complete all questions
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+                )
+
+                # Try to submit again after completion
+                with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+                    await handle.execute_update(
+                        PlayerEntityWorkflow.submit_answer,
+                        SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                    )
+                assert "completed" in str(exc_info.value.cause).lower()
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_marks_day_as_completed_after_last_question(self) -> None:
+        """Test that submit_answer marks day as completed after answering last question."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day and answer all questions
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q2", "C", False),
+                )
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+                )
+
+                # Verify day is marked as completed
+                state = await handle.query(PlayerEntityWorkflow.get_current_state)
+                assert "2025-03-10" in state.player.completed_days
+
+    @pytest.mark.asyncio
+    async def test_submit_answer_updates_total_score_correctly(self) -> None:
+        """Test that submit_answer updates total_score correctly across questions."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            mock_activities = MockQuestionsActivities()
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[PlayerEntityWorkflow],
+                activities=[mock_activities.get_questions_for_day],
+            ):
+                handle = await client.start_workflow(
+                    PlayerEntityWorkflow.run,
+                    args=["player-123", "alice@example.com", "Alice", "Smith"],
+                    id=f"test-player-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Start day
+                await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
+
+                # Answer 2 correct, 1 incorrect
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q1", "B", False),
+                )  # correct
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q2", "A", False),
+                )  # incorrect
+                await handle.execute_update(
+                    PlayerEntityWorkflow.submit_answer,
+                    SubmitAnswerRequest("2025-03-10", "q3", "B", False),
+                )  # correct
+
+                # Verify total score is 2
+                state = await handle.query(PlayerEntityWorkflow.get_current_state)
+                assert state.player.total_score == 2
+                assert state.player.daily_scores.get("2025-03-10", 0) == 2

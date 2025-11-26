@@ -309,10 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 in progress - 10/35 steps complete (28.6% total progress)
+**Current Status**: Phase 3 in progress - 11/35 steps complete (31.4% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 25% complete (2/8 steps)
+- Phase 3 (Workflow Implementation): 37.5% complete (3/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -410,6 +410,18 @@ Every source file must start with:
 - Helper method: `get_all_dates()` returns list[date] from start to end (inclusive)
 - 100% test coverage (9 test cases)
 - **Design Decision**: API/UI fields (title, description, colors, messages) will be added in Phase 4 when implementing the API layer. This follows TDD principles: only implement what's needed for the current phase.
+
+### Answer Models (`src/models/answer.py`)
+- **SubmitAnswerRequest**: Type-safe request model for submit_answer update handler
+  - Fields: date (str), question_id (str), answer_choice (str), show_correct_answer (bool)
+  - Used to maintain type safety when passing multiple parameters to update handlers
+  - Prevents parameter ordering errors and improves refactorability
+- **AnswerResult**: Type-safe response model for submit_answer update handler
+  - Fields: is_correct (bool), correct_answer (str | None), next_question (Question | None), completion_message (str | None), current_score (int), total_questions (int)
+  - Contains all feedback needed by client after answer submission
+  - Mutually exclusive next_question and completion_message
+- 100% test coverage (6 test cases)
+- **Design Pattern**: Request/response dataclasses for complex update handlers ensure type safety
 
 ## Temporal Activity Implementation Patterns (CRITICAL)
 
@@ -711,7 +723,7 @@ Before writing a workflow test:
 ## Workflows Implemented (Phase 3: 25% Complete)
 
 ### PlayerEntityWorkflow (`src/workflows/player.py`)
-- **Status**: Basic structure + start_day update handler complete (Steps 9-10) ✅
+- **Status**: COMPLETE - All core functionality implemented (Steps 9-11) ✅
 - **Pattern**: Entity workflow (runs indefinitely)
 - **State**: PlayerState with Player model + current_day + current_question_index + current_questions
 - **Run method**: Initializes state, runs indefinitely with `workflow.wait_condition(lambda: False)`
@@ -721,9 +733,13 @@ Before writing a workflow test:
   - `has_completed_day(date: str) -> bool` - Checks if day is completed
 - **Update handlers implemented**:
   - `start_day(date: str, file_path: str = "config/questions.json") -> Question` - Loads questions via activity, returns first question
-- **Testing**: 10 comprehensive tests (5 queries + 5 update handlers) with pydantic_data_converter and activity mocking
-- **Coverage**: 87.80% (41 statements, 5 missed)
-- **Next steps**: Implement submit_answer update handler (Step 11)
+  - `submit_answer(request: SubmitAnswerRequest) -> AnswerResult` - Validates answer, updates score, returns next question or completion
+- **Helper methods**:
+  - `_get_current_question() -> Question` - Returns current question with validation
+  - `_is_answer_correct(question: Question, answer: str) -> bool` - Checks answer correctness
+- **Testing**: 21 comprehensive tests with pydantic_data_converter and activity mocking
+- **Coverage**: 89.02% (82 statements, 9 missed)
+- **Next steps**: Implement DailyWorkflow (Step 12)
 
 ### PlayerState (`src/models/player.py`)
 - **Purpose**: Workflow state for PlayerEntityWorkflow
@@ -819,3 +835,96 @@ This project reuses patterns from:
    - NOT: `questions: dict[str, list[Question]]` (all days - wasteful!)
    - Reduces memory per workflow, prevents duplication
    - Think about scale: 1000 players × 50 questions vs 1000 players × 5 questions
+
+5. **Update Handler Exception Handling** 🔑🔑🔑 **CRITICAL**
+   ```python
+   from temporalio.exceptions import ApplicationError
+
+   # WRONG - Causes infinite retries and hung tests
+   @workflow.update
+   def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
+       if request.answer_choice not in ["A", "B", "C", "D"]:
+           raise ValueError("Invalid answer_choice")  # BAD! Infinite retries!
+
+   # CORRECT - Proper error propagation to client
+   @workflow.update
+   def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
+       if request.answer_choice not in ["A", "B", "C", "D"]:
+           raise ApplicationError("Invalid answer_choice")  # GOOD!
+   ```
+   - **MUST use `ApplicationError`** for all validation failures in update handlers
+   - **Other exceptions** (ValueError, TypeError, etc.) cause infinite retries
+   - Workflow gets stuck retrying, tests hang indefinitely
+   - From samples-python: "Other exceptions will cause the workflow to keep retrying and get it stuck"
+   - **This is the #1 gotcha for update handlers**
+
+6. **Testing Update Handler Exceptions** 🔑
+   ```python
+   from temporalio.client import WorkflowUpdateFailedError
+
+   # Test pattern for update handler errors
+   with pytest.raises(WorkflowUpdateFailedError) as exc_info:
+       await handle.execute_update(
+           PlayerEntityWorkflow.submit_answer,
+           SubmitAnswerRequest("2025-03-10", "q1", "E", False),  # Invalid answer
+       )
+   # Check the CAUSE, not the exception message
+   assert "answer_choice" in str(exc_info.value.cause).lower()
+   ```
+   - Use `WorkflowUpdateFailedError` from temporalio.client
+   - Check `exc_info.value.cause` for underlying ApplicationError
+   - Pattern from samples-python safe_message_handlers
+   - Do NOT use `pytest.raises(Exception)` or check `exc_info.value` directly
+
+7. **Type-Safe Request/Response Models** 🔑
+   ```python
+   # src/models/answer.py
+   @dataclass
+   class SubmitAnswerRequest:
+       """Request model for type-safe update handler parameters."""
+       date: str
+       question_id: str
+       answer_choice: str
+       show_correct_answer: bool
+
+   @dataclass
+   class AnswerResult:
+       """Response model for type-safe update handler returns."""
+       is_correct: bool
+       correct_answer: str | None
+       next_question: Question | None
+       completion_message: str | None
+       current_score: int
+       total_questions: int
+
+   # Usage in workflow
+   @workflow.update
+   def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
+       # Type-safe access to all fields
+       if request.answer_choice not in ["A", "B", "C", "D"]:
+           raise ApplicationError("Invalid answer")
+       return AnswerResult(...)
+   ```
+   - Multi-parameter update handlers → create request dataclass
+   - Complex return values → create response dataclass
+   - Both belong in `src/models/` (not in workflow file)
+   - Benefits: type safety, refactorability, clear API contracts
+
+8. **Update Handlers: Synchronous vs Asynchronous** 🔑
+   ```python
+   # Synchronous (no activities) - use def
+   @workflow.update
+   def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
+       is_correct = request.answer == question.correct_answer
+       return AnswerResult(is_correct=is_correct)
+
+   # Asynchronous (calls activities) - use async def
+   @workflow.update
+   async def start_day(self, date: str) -> Question:
+       questions = await workflow.execute_activity_method(...)
+       return questions[0]
+   ```
+   - Use `def` for pure validation/scoring logic
+   - Use `async def` only when calling activities or child workflows
+   - Match sync/async to whether you await operations
+   - Using `async def` without await can cause tests to hang

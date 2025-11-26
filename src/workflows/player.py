@@ -2,9 +2,12 @@
 # Handles answer submission, score tracking, and progress queries for individual players.
 
 from datetime import timedelta
+from typing import cast
 
 from temporalio import workflow
+from temporalio.exceptions import ApplicationError
 
+from src.models.answer import AnswerResult, SubmitAnswerRequest
 from src.models.player import Player, PlayerState
 from src.models.question import Question
 
@@ -160,7 +163,7 @@ class PlayerEntityWorkflow:
 
         # Check if day already completed
         if date in self.state.player.completed_days:
-            raise ValueError(f"Day {date} already completed")
+            raise ApplicationError(f"Day {date} already completed")
 
         # Import activity class
         from src.activities.questions import QuestionsActivities
@@ -180,3 +183,151 @@ class PlayerEntityWorkflow:
 
         # Return first question
         return questions[0]
+
+    @workflow.update
+    def submit_answer(self, request: SubmitAnswerRequest) -> AnswerResult:
+        """Update handler to submit an answer and progress through questions.
+
+        Validates the answer, updates scores if correct, and returns either the next
+        question or a completion message if all questions have been answered.
+
+        Args:
+            request: SubmitAnswerRequest containing date, question_id, answer_choice,
+                show_correct_answer
+
+        Returns:
+            AnswerResult: Contains feedback, next question or completion message, and scores
+
+        Raises:
+            RuntimeError: If workflow state is not initialized
+            ValueError: If validations fail (invalid date, answer choice, question_id, etc.)
+
+        Example:
+            >>> # Submit correct answer
+            >>> request = SubmitAnswerRequest("2025-03-10", "q1", "B", False)
+            >>> result = await handle.execute_update(
+            ...     PlayerEntityWorkflow.submit_answer, request
+            ... )
+            >>> assert result.is_correct is True
+            >>> assert result.next_question is not None
+        """
+        if self.state is None:
+            raise RuntimeError("Workflow state not initialized")
+
+        # Validate day has been started
+        if self.state.current_day is None:
+            raise ApplicationError("Day not started - call start_day first")
+
+        # Validate date matches current_day
+        if request.date != self.state.current_day:
+            raise ApplicationError(
+                f"Date {request.date} does not match current day {self.state.current_day}"
+            )
+
+        # Validate day not already completed
+        if request.date in self.state.player.completed_days:
+            raise ApplicationError(f"Day {request.date} already completed")
+
+        # Validate answer_choice is valid
+        if request.answer_choice not in ["A", "B", "C", "D"]:
+            raise ApplicationError(
+                f"Invalid answer_choice '{request.answer_choice}' - must be A, B, C, or D"
+            )
+
+        # Get current question
+        current_question = self._get_current_question()
+
+        # Validate question_id matches current question
+        if request.question_id != current_question.id:
+            raise ApplicationError(
+                f"Question ID {request.question_id} does not match "
+                f"current question {current_question.id}"
+            )
+
+        # Check if answer is correct
+        is_correct = self._is_answer_correct(current_question, request.answer_choice)
+
+        # Update scores if correct
+        if is_correct:
+            # Increment daily score
+            self.state.player.daily_scores[request.date] = (
+                self.state.player.daily_scores.get(request.date, 0) + 1
+            )
+            # Increment total score
+            self.state.player.total_score += 1
+
+        # Get current score and total questions
+        current_score = self.state.player.daily_scores.get(request.date, 0)
+        total_questions = (
+            len(self.state.current_questions) if self.state.current_questions else 0
+        )
+
+        # Increment question index
+        self.state.current_question_index += 1
+
+        # Check if more questions remain
+        if self.state.current_question_index < total_questions:
+            # More questions remain - return next question
+            # Cast safe: _get_current_question() validates current_questions is not None
+            next_question = cast(list[Question], self.state.current_questions)[
+                self.state.current_question_index
+            ]
+            return AnswerResult(
+                is_correct=is_correct,
+                correct_answer=(
+                    current_question.correct_answer if request.show_correct_answer else None
+                ),
+                next_question=next_question,
+                completion_message=None,
+                current_score=current_score,
+                total_questions=total_questions,
+            )
+        else:
+            # All questions answered - mark day as completed
+            self.state.player.completed_days.add(request.date)
+            completion_message = (
+                f"Day complete! You scored {current_score}/{total_questions}."
+            )
+            return AnswerResult(
+                is_correct=is_correct,
+                correct_answer=(
+                    current_question.correct_answer if request.show_correct_answer else None
+                ),
+                next_question=None,
+                completion_message=completion_message,
+                current_score=current_score,
+                total_questions=total_questions,
+            )
+
+    def _get_current_question(self) -> Question:
+        """Helper method to get the current question from state.
+
+        Returns:
+            Question: The current question based on current_question_index
+
+        Raises:
+            RuntimeError: If workflow state not initialized or no questions loaded
+            IndexError: If current_question_index is out of bounds
+        """
+        if self.state is None:
+            raise RuntimeError("Workflow state not initialized")
+
+        if self.state.current_questions is None:
+            raise RuntimeError("No questions loaded - call start_day first")
+
+        if self.state.current_question_index >= len(self.state.current_questions):
+            raise IndexError("Current question index out of bounds")
+
+        return self.state.current_questions[self.state.current_question_index]
+
+    def _is_answer_correct(self, question: Question, answer: str) -> bool:
+        """Helper method to check if an answer is correct.
+
+        Args:
+            question: The question being answered
+            answer: The answer choice (A, B, C, or D)
+
+        Returns:
+            bool: True if answer matches question's correct_answer, False otherwise
+        """
+        return answer == question.correct_answer

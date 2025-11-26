@@ -99,11 +99,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 11: PlayerEntityWorkflow - Submit Answer Update Handler
-- [ ] Write submit_answer update handler tests (correct/incorrect, next question, completion, validation)
-- [ ] Define AnswerResult dataclass
-- [ ] Implement submit_answer update handler
-- [ ] Refactor with helper methods (_get_current_question, _is_answer_correct)
-- [ ] Verify tests pass and run just check
+- [x] Write submit_answer update handler tests (correct/incorrect, next question, completion, validation)
+- [x] Define AnswerResult dataclass (in src/models/answer.py)
+- [x] Define SubmitAnswerRequest dataclass (for type safety)
+- [x] Implement submit_answer update handler (using ApplicationError for failures)
+- [x] Refactor with helper methods (_get_current_question, _is_answer_correct)
+- [x] Verify tests pass and run just check
 
 ### Step 12: DailyWorkflow - Basic Structure
 - [ ] Write DailyWorkflow initialization tests
@@ -328,12 +329,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
-**Phase 3: Workflow Implementation** - 2/8 steps complete (25%)
+**Phase 3: Workflow Implementation** - 3/8 steps complete (37.5%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 10/35 steps complete (28.6%)**
+**Total Progress: 11/35 steps complete (31.4%)**
 
 ---
 
