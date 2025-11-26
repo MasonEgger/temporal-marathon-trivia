@@ -345,10 +345,11 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 complete - 16/35 steps complete (45.7% total progress)
+**Current Status**: Phase 4 in progress - 17/35 steps complete (48.6% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
+- Phase 4 (API Layer): 16.7% complete (1/6 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -404,11 +405,46 @@ Every source file must start with:
 # Second line with additional context if needed.
 ```
 
-### Testing Principles
-- Focus on testing YOUR application logic, not framework behavior
-- Don't test pydantic validation framework itself
-- Don't test that Temporal SDK works correctly
-- Test your validation rules, business logic, and data transformations
+### Testing Principles 🔑 **CRITICAL**
+
+**Test ONLY application logic - NEVER test framework/library behavior:**
+
+**DO TEST** (application logic):
+- Specific response formats you define (`{"status": "ok"}`)
+- Business validation rules (age >= 0, answer in A/B/C/D)
+- Custom error handling and recovery logic
+- Data transformations unique to your application
+- Scoring algorithms, ranking logic
+- State machine transitions
+
+**DO NOT TEST** (framework/library behavior):
+- FastAPI routing mechanism, lifespan, middleware
+- Redis get/set operations, TTL behavior
+- Temporal SDK (workflow execution, queries, updates)
+- Pydantic validation framework itself
+- Database ORM query functionality
+- HTTP library request/response handling
+- Infrastructure wiring (connections, env vars)
+
+**Examples:**
+```python
+# ✅ CORRECT - Testing OUR application logic
+def test_health_endpoint_returns_ok():
+    response = client.get("/health")
+    assert response.json() == {"status": "ok"}  # OUR format
+
+# ❌ WRONG - Testing Redis library
+def test_redis_can_set_and_get():
+    await redis.set("key", "value")
+    assert await redis.get("key") == "value"  # Library behavior!
+
+# ❌ WRONG - Testing FastAPI framework
+def test_fastapi_app_can_be_created():
+    assert app is not None  # Framework behavior!
+```
+
+**When in doubt, ask**: "Am I testing MY code's logic, or verifying that a library/framework works?"
+
 - Test directories do NOT have `__init__.py` files
 
 ## Data Models Implemented (Phase 1 Complete)
@@ -831,7 +867,57 @@ Before writing a workflow test:
    - **Solution**: Return defensive copies from queries
    - **Pattern**: Use `dict()`, `set()` to copy mutable collections
 
-## Workflows Implemented (Phase 3: 87.5% Complete)
+## API Implementation (Phase 4: In Progress)
+
+### FastAPI Application (`src/api/main.py`)
+- **Status**: COMPLETE - Basic setup with health endpoint (Step 17) ✅
+- **Pattern**: Lifespan context manager for connection management
+- **Connections**: Temporal client (`app.state.temporal_client`), Redis (`app.state.redis`)
+- **Direct Redis Usage**: No wrapper layer - use Redis directly via `app.state.redis.get()`, `app.state.redis.set()`
+- **Health Endpoint**: `GET /health` returns `{"status": "ok"}`
+- **Testing**: 1 test for health endpoint (application logic only, not infrastructure)
+- **Coverage**: 63.16% (19 statements, 7 missed - lifespan infrastructure not tested)
+- **Design Decision**: Skipped RedisCache wrapper class - unnecessary abstraction with zero application logic
+
+### Testing Philosophy for API Layer 🔑 **CRITICAL**
+
+From Step 17 implementation - key lessons learned:
+
+**DO NOT create wrapper classes without application logic:**
+```python
+# ❌ WRONG - Unnecessary wrapper with zero logic
+class RedisCache:
+    async def get(self, key: str) -> str | None:
+        return await self.redis.get(key).decode()  # Pure pass-through!
+    async def set(self, key: str, value: str, ttl: int | None = None):
+        if ttl:
+            await self.redis.setex(key, ttl, value)  # Library call!
+
+# ✅ CORRECT - Use Redis directly
+app.state.redis = from_url(redis_url, decode_responses=True)
+value = await app.state.redis.get("key")  # Direct, simple, clear
+```
+
+**DO NOT test infrastructure wiring:**
+```python
+# ❌ WRONG - Testing lifespan
+def test_lifespan_connects_to_temporal():
+    # This tests FastAPI framework + Temporal SDK, not OUR logic
+
+# ❌ WRONG - Testing lifespan
+def test_lifespan_connects_to_redis():
+    # This tests FastAPI framework + Redis library, not OUR logic
+
+# ✅ CORRECT - Test application endpoints
+def test_health_endpoint_returns_ok():
+    # This tests OUR specific response format
+    response = client.get("/health")
+    assert response.json() == {"status": "ok"}
+```
+
+**Rationale**: Infrastructure code (connections, env vars, client initialization) has zero application logic. Testing it = testing that libraries work.
+
+## Workflows Implemented (Phase 3: 100% Complete)
 
 ### PlayerEntityWorkflow (`src/workflows/player.py`)
 - **Status**: COMPLETE - All core functionality implemented (Steps 9-11) ✅
