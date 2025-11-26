@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Marathon Trivia Platform is a web-based, multi-day trivia application designed for trade show booth engagement. It supports hundreds to thousands of concurrent players using Temporal workflows for state management.
+Marathon Trivia Platform is a web-based, multi-day trivia application designed for trade show booth engagement. Built for AWS re:Invent 2025 (50,000+ attendees).
 
 **Use Case**: Trade show booth staff deploy this for 3-5 day conferences. Attendees join via QR code, answer daily questions at their own pace, and compete on a live leaderboard for prizes.
+
+**⚠️ CRITICAL SCALE LIMITATION**: Current architecture has a **hard limit of ~2000 concurrent players** due to Temporal's child workflow restrictions. See "Known Limitations" section below for details and refactoring plan.
 
 ## Architecture
 
@@ -2016,3 +2018,107 @@ omit = [
 - Unit testing these = testing that Temporal SDK works
 - Integration testing covers end-to-end connectivity
 - Keeps coverage metric focused on application logic
+
+## Known Limitations and Future Architecture
+
+### CRITICAL: Scale Limitation (~2000 Player Hard Cap)
+
+**Current Architecture Issue**: PlayerEntityWorkflow instances are created as **child workflows** of EventWorkflow.
+
+**Problem**:
+- Temporal has a hard limit of **2000 concurrent child workflows per parent**
+- PlayerEntityWorkflow runs indefinitely (entire event duration)
+- For AWS re:Invent with 50,000+ attendees, current architecture cannot scale
+
+**Impact**:
+- ✅ Works for: <2000 concurrent players
+- ❌ Fails for: 2000+ players (registration will fail)
+- ❌ Cannot use Continue-As-New: Children are not carried over in Continue-As-New
+
+### Recommended Refactoring: Session-Based Architecture
+
+**Redesign Pattern** (to be implemented post-demo):
+
+#### 1. PlayerEntityWorkflow → Independent Entity (NOT a child)
+```
+PlayerEntityWorkflow (independent, not a child)
+├── Workflow ID: {event-id}-player-{initials}-{uuid}
+├── Runs independently from EventWorkflow
+├── Tracks lifetime stats (total_score, daily_scores, completed_days)
+├── Can be started/queried at any time
+└── No parent-child relationship
+```
+
+**Benefits**:
+- No 2000 child limit
+- Can scale to 50,000+ players
+- EventWorkflow can Continue-As-New safely
+
+#### 2. GameSessionWorkflow → Short-Lived Child (NEW)
+```
+GameSessionWorkflow (child of EventWorkflow, time-limited)
+├── Workflow ID: {event-id}-session-{player-initials}-{uuid}
+├── Created when player starts answering questions
+├── Timeout: 10 minutes (configurable)
+├── Handles: answer validation, scoring, question progression
+├── On complete: Signals PlayerEntityWorkflow with final score
+└── Status: COMPLETED (not running indefinitely)
+```
+
+**Benefits**:
+- Short-lived (10 min max per session)
+- Auto-cleanup prevents resource leaks
+- EventWorkflow only tracks active sessions (<100 concurrent)
+- Can Continue-As-New without losing player data
+
+#### 3. Updated EventWorkflow Flow
+```
+User Registration:
+1. POST /api/join → EventWorkflow.register_player()
+2. EventWorkflow starts PlayerEntityWorkflow (independent, NOT child)
+3. Return player_id to user
+
+User Starts Day:
+1. GET /api/day/{date}/start → Start GameSessionWorkflow (child of EventWorkflow)
+2. GameSessionWorkflow loads questions, tracks current question
+3. User answers questions via updates to GameSessionWorkflow
+4. On completion/timeout: GameSessionWorkflow signals PlayerEntityWorkflow
+5. GameSessionWorkflow completes (status: COMPLETED)
+
+Leaderboard Query:
+1. Query DailyWorkflow for aggregated scores (unchanged)
+2. DailyWorkflow receives updates from GameSessionWorkflow completions
+```
+
+### Implementation Priority
+
+**Phase 1 (Current - Demo Ready)**:
+- ✅ Basic architecture works for <2000 players
+- ✅ All workflows, API, frontend functional
+- ✅ Integration tests passing
+- ⚠️ Known limitation documented
+
+**Phase 2 (Post-Demo - Required for re:Invent Scale)**:
+- [ ] Refactor PlayerEntityWorkflow to independent entity
+- [ ] Create GameSessionWorkflow with timeout
+- [ ] Update EventWorkflow.register_player (don't create as child)
+- [ ] Update API routes to start GameSessionWorkflow
+- [ ] Add session timeout handling (10 min default)
+- [ ] Update integration tests
+- [ ] Load test with 10,000+ simulated players
+
+### Estimated Refactoring Effort
+
+- **Time**: 2-3 days
+- **Risk**: Medium (requires workflow contract changes)
+- **Testing**: Critical (must verify player state persists correctly)
+- **Deployment**: Can be done in place (backwards compatible workflow IDs)
+
+### Workaround for Demo (if needed)
+
+If player count exceeds 2000 during demo:
+1. Deploy multiple EventWorkflow instances (one per 1500 players)
+2. Use event IDs: `reinvent-day1-shard1`, `reinvent-day1-shard2`, etc.
+3. Aggregate leaderboards across shards in API layer
+4. **Not recommended for production** - use proper refactoring instead
+

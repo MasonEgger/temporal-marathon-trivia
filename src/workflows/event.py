@@ -101,14 +101,15 @@ class EventWorkflow:
         # Schedule daily child workflows for each event day
         # Create scheduling tasks but don't await them (they run in background)
         scheduling_tasks = []
-        for event_date in config.get_all_dates():
-            task = asyncio.create_task(self._schedule_daily_workflow(event_date))
+        all_dates = config.get_all_dates()
+        for day_num, event_date in enumerate(all_dates, start=1):
+            task = asyncio.create_task(self._schedule_daily_workflow(event_date, day_num))
             scheduling_tasks.append(task)
 
         # Keep workflow running indefinitely to manage event
         await workflow.wait_condition(lambda: False)
 
-    async def _schedule_daily_workflow(self, event_date: date) -> None:
+    async def _schedule_daily_workflow(self, event_date: date, day_num: int) -> None:
         """Schedule and start a DailyWorkflow for a specific event date.
 
         This helper method calculates the start datetime for the given event date,
@@ -151,9 +152,9 @@ class EventWorkflow:
             start_to_close_timeout=timedelta(seconds=10),
         )
 
-        # Generate workflow ID for this daily workflow
+        # Generate workflow ID for this daily workflow (e.g., "test-parent-day1")
         date_str = event_date.isoformat()
-        daily_workflow_id = f"{self.state.event_id}-{date_str}"
+        daily_workflow_id = f"{self.state.event_id}-day{day_num}"
 
         # Start DailyWorkflow as child workflow
         await workflow.start_child_workflow(
@@ -244,8 +245,13 @@ class EventWorkflow:
         if not is_valid:
             raise ApplicationError(f"Invalid email address: {request.email}")
 
-        # Generate new player_id using workflow.uuid4()
-        player_id = str(workflow.uuid4())
+        # Generate meaningful player_id using initials (e.g., "test-player-AS" for Alice Smith)
+        first_initial = request.first_name[0].upper() if request.first_name else "X"
+        last_initial = request.last_name[0].upper() if request.last_name else "X"
+        base_player_id = f"{self.state.event_id}-player-{first_initial}{last_initial}"
+
+        # Add UUID suffix to ensure uniqueness (multiple players with same initials)
+        player_id = f"{base_player_id}-{str(workflow.uuid4())[:8]}"
 
         # Start PlayerEntityWorkflow as child workflow
         # Await the start but don't await the handle (runs indefinitely)

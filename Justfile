@@ -13,9 +13,9 @@ test:
 test-unit:
     uv run pytest tests/unit/
 
-# Run integration tests only
+# Run integration tests only (no coverage - tests run against real Temporal server)
 test-integration:
-    uv run pytest tests/integration/
+    uv run pytest tests/integration/ --no-cov
 
 # Run linter
 lint:
