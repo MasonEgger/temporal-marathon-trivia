@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Lifespan context manager for FastAPI application.
 
     Handles startup and shutdown of external connections:
-    - Load EventConfig from TOML file
+    - Load EventConfig and UXConfig from TOML file
     - Temporal client connection
     - Redis connection
 
@@ -28,10 +28,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     Yields:
         None (app runs with connections active)
     """
-    # Startup: Load EventConfig from TOML file
+    # Startup: Load EventConfig and UXConfig from TOML file
     config_path = os.getenv("EVENT_CONFIG_PATH", "config/event.toml")
     config_activities = ConfigActivities()
     app.state.config = config_activities.load_event_config(config_path)
+    app.state.ux_config = config_activities.load_ux_config(config_path)
 
     # Startup: Connect to Temporal
     temporal_address = os.getenv("TEMPORAL_ADDRESS", "localhost:7233")

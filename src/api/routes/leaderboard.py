@@ -185,3 +185,65 @@ def aggregate_leaderboards(
         )
 
     return aggregated_entries
+
+
+@router.get("/api/config")
+async def get_config(request: Request) -> dict[str, Any]:
+    """Get event configuration for frontend initialization.
+
+    This endpoint returns combined EventConfig and UXConfig data as JSON.
+    Configuration is loaded once at API startup and cached permanently in Redis.
+
+    Returns:
+        dict: Combined configuration with event details, dates, and UX settings
+
+    Response Schema:
+        {
+            "title": str,
+            "description": str,
+            "start_date": str (ISO format),
+            "end_date": str (ISO format),
+            "day_start_time": str (HH:MM:SS),
+            "day_end_time": str (HH:MM:SS),
+            "dates": list[str] (all event dates),
+            "colors": {
+                "primary": str,
+                "secondary": str,
+                "background": str,
+                "text": str
+            }
+        }
+    """
+    redis = request.app.state.redis
+    config = request.app.state.config
+    ux_config = request.app.state.ux_config
+
+    # Check Redis cache (permanent - no expiration)
+    cache_key = "config:event"
+    cached_json = await redis.get(cache_key)
+    if cached_json:
+        result: dict[str, Any] = json.loads(cached_json)
+        return result
+
+    # Cache miss - build response from app.state
+    all_dates = config.get_all_dates()
+    response_data = {
+        "title": ux_config.title,
+        "description": ux_config.description,
+        "start_date": config.start_date.isoformat(),
+        "end_date": config.end_date.isoformat(),
+        "day_start_time": config.day_start_time.isoformat(),
+        "day_end_time": config.day_end_time.isoformat(),
+        "dates": [d.isoformat() for d in all_dates],
+        "colors": {
+            "primary": ux_config.primary_color,
+            "secondary": ux_config.secondary_color,
+            "background": ux_config.background_color,
+            "text": ux_config.text_color,
+        },
+    }
+
+    # Cache permanently (no expiration)
+    await redis.set(cache_key, json.dumps(response_data))
+
+    return response_data

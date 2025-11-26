@@ -20,7 +20,7 @@
             </thead>
             <tbody class="divide-y divide-gray-200">
                 {% for entry in leaderboard %}
-                <tr class="{% if entry.rank == 1 %}bg-yellow-50 rank-1{% elif entry.rank == 2 %}bg-gray-50 rank-2{% elif entry.rank == 3 %}bg-orange-50 rank-3{% else %}hover:bg-gray-50{% endif %} transition-colors duration-150">
+                <tr class="{% if highlight_email and entry.email == highlight_email %}bg-green-100 border-4 border-green-500 player-highlight{% elif entry.rank == 1 %}bg-yellow-50 rank-1{% elif entry.rank == 2 %}bg-gray-50 rank-2{% elif entry.rank == 3 %}bg-orange-50 rank-3{% else %}hover:bg-gray-50{% endif %} transition-colors duration-150">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             {% if entry.rank == 1 %}
@@ -103,5 +103,16 @@
     tr:hover {
         transform: scale(1.01);
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* Player highlight styling */
+    .player-highlight {
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+        animation: highlight-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes highlight-pulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+        50% { box-shadow: 0 0 30px rgba(34, 197, 94, 0.8); }
     }
 </style>

@@ -349,11 +349,12 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 4 in progress - 21/35 steps complete (60.0% total progress)
+**Current Status**: Phase 4 complete - 22/35 steps complete (62.9% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
-- Phase 4 (API Layer): 83.3% complete (5/6 steps)
+- Phase 4 (API Layer): 100% complete ✅
+- Phase 5 (Frontend and Integration): 0% complete (next phase)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -474,7 +475,7 @@ def test_fastapi_app_can_be_created():
 - 100% test coverage (3 test cases)
 
 ### EventConfig Model (`src/models/config.py`)
-- **Workflow-essential fields only** (API/UI fields deferred to Phase 4)
+- **Workflow-essential fields only** - Separate from UXConfig for clean separation of concerns
 - Date/timing fields: start_date, end_date, day_start_time, day_end_time, timezone
 - Questions: questions_file_path, questions_per_day
 - Feature flags: show_correct_answer, require_work_email
@@ -485,7 +486,16 @@ def test_fastapi_app_can_be_created():
   - `validate_questions_per_day()`: Ensures positive integer (> 0)
 - Helper method: `get_all_dates()` returns list[date] from start to end (inclusive)
 - 100% test coverage (9 test cases)
-- **Design Decision**: API/UI fields (title, description, colors, messages) will be added in Phase 4 when implementing the API layer. This follows TDD principles: only implement what's needed for the current phase.
+
+### UXConfig Model (`src/models/ux_config.py`)
+- **UI/presentation fields only** - Separate from EventConfig for clean separation of concerns
+- Branding: title, description, base_url
+- Messages: completion_message, day_over_message, not_started_message, already_completed_message
+- Colors: primary_color, secondary_color, background_color, text_color
+- Loaded at API startup alongside EventConfig
+- Combined at API boundary: GET /api/config merges both for frontend consumption
+- 100% test coverage
+- **Design Decision**: Separating EventConfig (business logic) from UXConfig (presentation) enables independent evolution and easier testing
 
 ### Answer Models (`src/models/answer.py`)
 - **SubmitAnswerRequest**: Type-safe request model for submit_answer update handler
@@ -876,7 +886,7 @@ Before writing a workflow test:
    - **Solution**: Return defensive copies from queries
    - **Pattern**: Use `dict()`, `set()` to copy mutable collections
 
-## API Implementation (Phase 4: In Progress)
+## API Implementation (Phase 4: 100% Complete ✅)
 
 ### FastAPI Application (`src/api/main.py`)
 - **Status**: COMPLETE - Basic setup with health endpoint and config loading (Steps 17, 20) ✅
@@ -992,6 +1002,25 @@ Before writing a workflow test:
   - Partial participation (players missing some days)
 - **Coverage**: 100% (56 statements, 0 missed)
 - **Design Pattern**: Cache business data (JSON), render presentation layer fresh
+
+#### GET /api/config - Event Configuration
+- **Pattern**: Returns combined EventConfig + UXConfig as JSON
+- **Response**: JSON with event details, dates, colors for frontend initialization
+- **Caching Strategy**: Permanent Redis caching (no TTL) - configuration is static data
+  - Key: `config:event`
+  - No expiration - config doesn't change during event
+- **Data Combination**: Merges EventConfig (business logic) with UXConfig (presentation)
+- **Testing**: 2 unit tests (JSON structure, permanent caching)
+- **Coverage**: Part of leaderboard.py (97.14% overall)
+
+#### GET /api/player - Player Lookup with Highlighting
+- **Pattern**: Queries PlayerEntityWorkflow for player email, fetches leaderboard, renders with highlighting
+- **Response**: HTML leaderboard with player's row highlighted (green pulsing border)
+- **Cookie Validation**: Manual validation (HTMX pattern - returns 200 + error HTML)
+- **Caching**: Reuses leaderboard cache (30s TTL) if available
+- **Highlighting**: Conditional CSS class + animation for player's row
+- **Testing**: 2 unit tests (highlighting, cookie requirement)
+- **Coverage**: Part of player.py (93.55% overall)
 
 ### EventConfig Loading Pattern 🔑 **CRITICAL** (Step 20)
 
@@ -1155,6 +1184,33 @@ def test_requires_player_id_cookie():
 ```
 
 **From Step 19**: This architectural decision emerged from analyzing two approaches (FastAPI validation vs manual) and choosing the one that best supports HTMX's HTML fragment model.
+
+### Async Redis Operations (Step 22) 🔑 **CRITICAL**
+
+**Problem**: Forgetting to await async Redis operations causes type errors.
+
+**Error**:
+```
+TypeError: the JSON object must be str, bytes or bytearray, not coroutine
+```
+
+**Solution**: Always await Redis operations in async endpoints
+```python
+# WRONG - Returns coroutine object
+cached_data = redis.get(cache_key)  # Missing await!
+
+# CORRECT - Returns actual value
+cached_data = await redis.get(cache_key)
+await redis.set(cache_key, value, ex=30)
+```
+
+**Pattern**: In async FastAPI endpoints, ALL async operations must be awaited:
+- `await redis.get(key)`
+- `await redis.set(key, value, ex=ttl)`
+- `await temporal_client.get_workflow_handle(...).query(...)`
+- `await temporal_client.get_workflow_handle(...).execute_update(...)`
+
+**From Step 22**: This is a common gotcha when working with async/await patterns.
 
 ## Workflows Implemented (Phase 3: 100% Complete)
 

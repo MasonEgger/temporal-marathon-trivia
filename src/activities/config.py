@@ -8,6 +8,7 @@ from pathlib import Path
 from temporalio import activity
 
 from src.models.config import EventConfig
+from src.models.ux_config import UXConfig
 
 
 class ConfigActivities:
@@ -105,4 +106,74 @@ class ConfigActivities:
             require_work_email=features_section["require_work_email"],
             s3_bucket_name=s3_section["bucket_name"],
             s3_region=s3_section["region"],
+        )
+
+    @activity.defn
+    def load_ux_config(self, config_path: str) -> UXConfig:
+        """Load and parse UX configuration from TOML file.
+
+        Reads a TOML configuration file and extracts UI/presentation fields
+        including branding, colors, and user-facing messages.
+
+        Args:
+            config_path: Path to the TOML configuration file
+
+        Returns:
+            UXConfig: UX configuration instance with branding and UI settings
+
+        Raises:
+            FileNotFoundError: If the configuration file does not exist
+            ValueError: If the TOML file is malformed or required sections are missing
+
+        Example:
+            >>> activities = ConfigActivities()
+            >>> ux_config = activities.load_ux_config("config/event.toml")
+            >>> print(ux_config.title)
+            AWS re:Invent 2025 Trivia
+        """
+        # Check if file exists
+        config_file = Path(config_path)
+        if not config_file.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+        # Read and parse TOML file
+        try:
+            with open(config_file, "rb") as f:
+                data = tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            raise ValueError(f"Failed to parse TOML configuration file: {e}") from e
+        except Exception as e:
+            raise ValueError(f"Error reading configuration file: {e}") from e
+
+        # Extract sections - provide helpful error messages for missing sections
+        try:
+            event_section = data["event"]
+        except KeyError as e:
+            raise ValueError("Missing required section '[event]' in configuration file") from e
+
+        try:
+            ui_messages_section = data["ui"]["messages"]
+        except KeyError as e:
+            raise ValueError(
+                "Missing required section '[ui.messages]' in configuration file"
+            ) from e
+
+        try:
+            ui_colors_section = data["ui"]["colors"]
+        except KeyError as e:
+            raise ValueError("Missing required section '[ui.colors]' in configuration file") from e
+
+        # Create and return UXConfig instance
+        return UXConfig(
+            title=event_section["title"],
+            description=event_section["description"],
+            base_url=event_section["base_url"],
+            completion_message=ui_messages_section["completion_message"],
+            day_over_message=ui_messages_section["day_over_message"],
+            not_started_message=ui_messages_section["not_started_message"],
+            already_completed_message=ui_messages_section["already_completed_message"],
+            primary_color=ui_colors_section["primary_color"],
+            secondary_color=ui_colors_section["secondary_color"],
+            background_color=ui_colors_section["background_color"],
+            text_color=ui_colors_section["text_color"],
         )

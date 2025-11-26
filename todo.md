@@ -198,12 +198,18 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 22: API Routes - Configuration and Player Lookup
-- [ ] Write config and player endpoints tests
-- [ ] Implement GET /api/config endpoint with caching
-- [ ] Implement GET /api/player endpoint with highlighting
-- [ ] Update templates for player highlighting
-- [ ] Refactor with player state caching
-- [ ] Verify tests pass and run just check
+- [x] Write config and player endpoints tests (4 tests)
+- [x] Create UXConfig dataclass for UI/presentation settings
+- [x] Add load_ux_config activity to ConfigActivities
+- [x] Update test fixture config.toml with UI sections
+- [x] Load UXConfig at API startup alongside EventConfig
+- [x] Implement GET /api/config endpoint with permanent Redis caching
+- [x] Implement GET /api/player endpoint with leaderboard highlighting
+- [x] Update leaderboard.html template for player highlighting
+- [x] Fix async Redis operations (await get/set)
+- [x] Fix line length issues for ruff compliance
+- [x] Fix mypy type issue with json.loads return type
+- [x] Verify tests pass and run just check (159 tests, 89.83% coverage)
 
 ---
 
@@ -335,11 +341,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 8/8 steps complete (100%) ✅
-**Phase 4: API Layer** - 5/6 steps complete (83.3%)
+**Phase 4: API Layer** - 6/6 steps complete (100%) ✅
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 21/35 steps complete (60.0%)**
+**Total Progress: 22/35 steps complete (62.9%)**
 
 ---
 

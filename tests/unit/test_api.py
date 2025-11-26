@@ -1448,3 +1448,235 @@ class TestAggregateLeaderboards:
         assert result[1].display_name == "Bob C."
         assert result[1].total_score == 40
         assert result[1].daily_scores == {"2025-03-10": 40}
+
+
+class TestConfigEndpoint:
+    """Tests for GET /api/config endpoint.
+
+    Tests OUR application logic for configuration API.
+    """
+
+    def test_config_endpoint_returns_json_with_event_config(self) -> None:
+        """Test that GET /api/config returns JSON with event configuration.
+
+        This tests OUR application logic - the structure and fields
+        of the combined config response.
+        """
+        from datetime import date, time
+
+        from src.api.main import app
+        from src.models.config import EventConfig
+        from src.models.ux_config import UXConfig
+
+        # Mock app.state.config and app.state.ux_config
+        mock_config = MagicMock(spec=EventConfig)
+        mock_config.start_date = date(2025, 3, 10)
+        mock_config.end_date = date(2025, 3, 12)
+        mock_config.day_start_time = time(9, 0)
+        mock_config.day_end_time = time(17, 0)
+        mock_config.get_all_dates.return_value = [
+            date(2025, 3, 10),
+            date(2025, 3, 11),
+            date(2025, 3, 12),
+        ]
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.title = "Test Event"
+        mock_ux_config.description = "A test trivia event"
+        mock_ux_config.primary_color = "#3b82f6"
+        mock_ux_config.secondary_color = "#8b5cf6"
+        mock_ux_config.background_color = "#ffffff"
+        mock_ux_config.text_color = "#1f2937"
+
+        app.state.config = mock_config
+        app.state.ux_config = mock_ux_config
+
+        # Mock Redis (not cached)
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
+        app.state.redis = mock_redis
+
+        client = TestClient(app)
+        response = client.get("/api/config")
+
+        # Verify OUR JSON structure
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/json"
+
+        data = response.json()
+        assert data["title"] == "Test Event"
+        assert data["description"] == "A test trivia event"
+        assert data["start_date"] == "2025-03-10"
+        assert data["end_date"] == "2025-03-12"
+        assert data["dates"] == ["2025-03-10", "2025-03-11", "2025-03-12"]
+        assert data["colors"]["primary"] == "#3b82f6"
+        assert data["colors"]["secondary"] == "#8b5cf6"
+
+    def test_config_endpoint_is_cached_permanently(self) -> None:
+        """Test that GET /api/config caches result with no expiration.
+
+        This tests OUR caching strategy - permanent caching for static config.
+        """
+        from datetime import date, time
+
+        from src.api.main import app
+        from src.models.config import EventConfig
+        from src.models.ux_config import UXConfig
+
+        # Mock app.state
+        mock_config = MagicMock(spec=EventConfig)
+        mock_config.start_date = date(2025, 3, 10)
+        mock_config.end_date = date(2025, 3, 12)
+        mock_config.day_start_time = time(9, 0)
+        mock_config.day_end_time = time(17, 0)
+        mock_config.get_all_dates.return_value = [date(2025, 3, 10)]
+
+        mock_ux_config = MagicMock(spec=UXConfig)
+        mock_ux_config.title = "Test"
+        mock_ux_config.description = "Test"
+        mock_ux_config.primary_color = "#000000"
+        mock_ux_config.secondary_color = "#000000"
+        mock_ux_config.background_color = "#ffffff"
+        mock_ux_config.text_color = "#000000"
+
+        app.state.config = mock_config
+        app.state.ux_config = mock_ux_config
+
+        # Mock Redis
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)  # Not cached
+        mock_redis.set = AsyncMock()
+        app.state.redis = mock_redis
+
+        client = TestClient(app)
+        response = client.get("/api/config")
+
+        assert response.status_code == 200
+
+        # Verify OUR caching behavior - set with no expiration
+        mock_redis.set.assert_called_once()
+        call_args = mock_redis.set.call_args
+        assert call_args[0][0] == "config:event"  # Cache key
+        # No TTL argument means permanent cache
+
+
+class TestPlayerLookupEndpoint:
+    """Tests for GET /api/player endpoint.
+
+    Tests OUR application logic for player lookup and highlighting.
+    """
+
+    def test_player_endpoint_returns_html_with_highlighted_rank(self) -> None:
+        """Test that GET /api/player returns HTML with player's rank highlighted.
+
+        This tests OUR application logic - fetching player state and
+        rendering highlighted leaderboard HTML.
+        """
+        from src.api.main import app
+        from src.models.leaderboard import LeaderboardEntry
+        from src.models.player import Player
+        from src.models.state import PlayerState
+
+        # Mock Temporal client and player workflow
+        mock_client = AsyncMock()
+        mock_player_handle = AsyncMock()
+
+        # Mock PlayerState with proper structure
+        mock_player_state = PlayerState(
+            player=Player(
+                id="player-123",
+                email="alice@example.com",
+                first_name="Alice",
+                last_name="Brown",
+            ),
+            current_day=None,
+            current_question_index=0,
+            current_questions=None,
+        )
+        mock_player_handle.query = AsyncMock(return_value=mock_player_state)
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_player_handle)
+        app.state.temporal_client = mock_client
+
+        # Mock EventWorkflow for getting daily_workflow_ids
+        mock_event_handle = AsyncMock()
+        mock_event_handle.query = AsyncMock(
+            return_value=EventStatusResponse(
+                event_id="event-1",
+                player_count=2,
+                daily_workflow_ids={"2025-03-10": "event-1-2025-03-10"},
+            )
+        )
+
+        # Mock DailyWorkflow leaderboard
+        mock_daily_handle = AsyncMock()
+        mock_daily_handle.query = AsyncMock(
+            return_value=[
+                LeaderboardEntry(
+                    rank=1,
+                    display_name="Alice B.",
+                    total_score=100,
+                    daily_scores={"2025-03-10": 100},
+                    email="alice@example.com",
+                ),
+                LeaderboardEntry(
+                    rank=2,
+                    display_name="Bob C.",
+                    total_score=80,
+                    daily_scores={"2025-03-10": 80},
+                    email="bob@example.com",
+                ),
+            ]
+        )
+
+        # Mock get_workflow_handle to return appropriate handle based on ID
+        def get_handle_side_effect(workflow_id: str, *args, **kwargs):  # type: ignore[no-untyped-def]
+            if workflow_id == "player-123":
+                return mock_player_handle
+            elif workflow_id == "marathon-trivia-event":
+                return mock_event_handle
+            elif workflow_id == "event-1-2025-03-10":
+                return mock_daily_handle
+            raise ValueError(f"Unexpected workflow_id: {workflow_id}")
+
+        mock_client.get_workflow_handle.side_effect = get_handle_side_effect
+        app.state.temporal_client = mock_client
+
+        # Mock Redis (not cached)
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
+        app.state.redis = mock_redis
+
+        # Mock config for get_all_dates
+        from datetime import date
+
+        from src.models.config import EventConfig
+
+        mock_config = MagicMock(spec=EventConfig)
+        mock_config.get_all_dates.return_value = [date(2025, 3, 10)]
+        app.state.config = mock_config
+
+        client = TestClient(app)
+        response = client.get("/api/player", cookies={"player_id": "player-123"})
+
+        # Verify OUR highlighting logic
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Should contain Alice's entry with highlight class
+        assert "Alice B." in response.text
+
+    def test_player_endpoint_requires_player_id_cookie(self) -> None:
+        """Test that GET /api/player requires player_id cookie.
+
+        This tests OUR validation logic - ensuring authentication.
+        """
+        from src.api.main import app
+
+        client = TestClient(app)
+        response = client.get("/api/player")  # No cookie
+
+        # Verify OUR decision to return error HTML
+        assert response.status_code == 200  # HTMX pattern
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()

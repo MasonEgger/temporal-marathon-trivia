@@ -1,6 +1,11 @@
 # Test fixture: Valid event configuration for a 3-day event
 # Used by test_activities.py to test TOML parsing
 
+[event]
+title = "Test Event Trivia"
+description = "A test trivia event"
+base_url = "test.example.com"
+
 [dates]
 start_date = "2025-03-10"
 end_date = "2025-03-12"
@@ -19,3 +24,15 @@ require_work_email = true
 [s3]
 bucket_name = "test-marathon-trivia"
 region = "us-west-2"
+
+[ui.messages]
+completion_message = "Great job! Check the leaderboard."
+day_over_message = "Today's questions have closed. Come back tomorrow!"
+not_started_message = "Questions are not available yet."
+already_completed_message = "You've already completed today's questions."
+
+[ui.colors]
+primary_color = "#3b82f6"
+secondary_color = "#8b5cf6"
+background_color = "#ffffff"
+text_color = "#1f2937"
