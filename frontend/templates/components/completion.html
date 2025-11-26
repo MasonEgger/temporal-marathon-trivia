@@ -1,0 +1,17 @@
+<!-- Day completion message template for HTMX -->
+<div id="main" class="completion-container">
+    <h1 class="completion-heading">Day Complete!</h1>
+
+    <div class="score-display">
+        <p class="score-text">Your score: <strong>{{ score }}/{{ total }}</strong></p>
+    </div>
+
+    <div class="completion-message">
+        <p>{{ completion_message }}</p>
+    </div>
+
+    <div class="actions">
+        <a href="/" class="btn-primary">Back to Home</a>
+        <a href="/api/leaderboard" class="btn-secondary" hx-get="/api/leaderboard" hx-target="#main">View Leaderboard</a>
+    </div>
+</div>

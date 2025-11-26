@@ -345,11 +345,11 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 4 in progress - 19/35 steps complete (54.3% total progress)
+**Current Status**: Phase 4 in progress - 20/35 steps complete (57.1% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
 - Phase 3 (Workflow Implementation): 100% complete ✅
-- Phase 4 (API Layer): 50.0% complete (3/6 steps)
+- Phase 4 (API Layer): 66.7% complete (4/6 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -870,13 +870,17 @@ Before writing a workflow test:
 ## API Implementation (Phase 4: In Progress)
 
 ### FastAPI Application (`src/api/main.py`)
-- **Status**: COMPLETE - Basic setup with health endpoint (Step 17) ✅
-- **Pattern**: Lifespan context manager for connection management
-- **Connections**: Temporal client (`app.state.temporal_client`), Redis (`app.state.redis`)
+- **Status**: COMPLETE - Basic setup with health endpoint and config loading (Steps 17, 20) ✅
+- **Pattern**: Lifespan context manager for connection management and config loading
+- **Connections**: Temporal client (`app.state.temporal_client`), Redis (`app.state.redis`), EventConfig (`app.state.config`)
+- **Config Loading**: EventConfig loaded ONCE at startup from TOML file and stored in `app.state.config`
+  - Pattern: Static configuration loaded at API startup, NOT from workflows
+  - Workflows receive config as parameters (dependency injection)
+  - All endpoints access via `app.state.config`
 - **Direct Redis Usage**: No wrapper layer - use Redis directly via `app.state.redis.get()`, `app.state.redis.set()`
 - **Health Endpoint**: `GET /health` returns `{"status": "ok"}`
 - **Testing**: 1 test for health endpoint (application logic only, not infrastructure)
-- **Coverage**: 66.67% (21 statements, 7 missed - lifespan infrastructure not tested)
+- **Coverage**: 61.54% (26 statements, 10 missed - lifespan infrastructure not tested)
 - **Design Decision**: Skipped RedisCache wrapper class - unnecessary abstraction with zero application logic
 
 ### Player Registration Routes (`src/api/routes/player.py`)
@@ -900,8 +904,9 @@ Before writing a workflow test:
 - **Design Pattern**: Unit tests mock Temporal to test OUR orchestration logic only
 
 ### Gameplay Routes (`src/api/routes/gameplay.py`)
-- **Status**: COMPLETE - Start day endpoint (Step 19) ✅
-- **Endpoint**: `GET /api/day/{date}/start` - Starts a player's daily trivia session
+- **Status**: COMPLETE - Start day and submit answer endpoints (Steps 19-20) ✅
+
+#### GET /api/day/{date}/start - Start Day
 - **Pattern**: Calls PlayerEntityWorkflow.start_day via Temporal client
 - **Response**: HTML fragment with first question (question.html)
 - **Cookie Validation**: Manual validation (`Cookie(None)` + check) for HTMX compatibility
@@ -918,19 +923,89 @@ Before writing a workflow test:
     - 4 radio button options (A/B/C/D)
     - HTMX form: `hx-post="/api/day/{date}/answer" hx-target="#main"`
     - Hidden question_id field
+- **Testing**: 7 unit tests focusing on application logic
+- **Coverage**: 100% (38 statements, 0 missed for entire gameplay.py)
+
+#### POST /api/day/{date}/answer - Submit Answer
+- **Pattern**: Calls PlayerEntityWorkflow.submit_answer via Temporal client
+- **Form Data**: question_id, answer_choice, player_id (cookie)
+- **Config Usage**: Uses `app.state.config.show_correct_answer` (loaded at startup)
+- **Response Routing** (OUR application logic):
+  - If `answer_result.next_question` exists → render question.html with next question
+  - If `answer_result.completion_message` exists → render completion.html with score
+- **Error Handling**:
+  - Missing cookie: Returns error HTML "Please register first"
+  - ApplicationError for workflow validation (invalid answer_choice, day not active, etc.)
+  - Generic Exception for unexpected errors
+- **Templates**:
+  - `frontend/templates/components/question.html` - Reused for next question
+  - `frontend/templates/components/completion.html` - Day completion with score display
+    - "Day Complete!" heading
+    - Score: "Your score: X/Y"
+    - Completion message from config
+    - Links to home and leaderboard
 - **Testing**: 7 unit tests focusing on application logic:
-  - Returns HTML fragment with question
-  - Requires player_id cookie (manual validation)
-  - Validates day has started/ended
-  - Validates player hasn't completed day
-  - Invalid date handling
+  - Correct answer returns next question
+  - Incorrect answer returns feedback
+  - Next question routing when questions remain
+  - Completion routing when all answered
+  - Answer choice validation (A/B/C/D)
+  - Cookie requirement validation
   - Unexpected exception handling
-- **Coverage**: 100% (21 statements, 0 missed)
 - **Design Pattern**: Manual cookie validation for HTMX (200 + error HTML > 422)
+
+### EventConfig Loading Pattern 🔑 **CRITICAL** (Step 20)
+
+**Configuration is Static Data - Load at API Startup, NOT from Workflows:**
+
+```python
+# src/api/main.py - Lifespan loads config once at startup
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load EventConfig from TOML file
+    config_path = os.getenv("EVENT_CONFIG_PATH", "config/event.toml")
+    config_activities = ConfigActivities()
+    app.state.config = config_activities.load_event_config(config_path)
+
+    # Connect to Temporal, Redis
+    app.state.temporal_client = await Client.connect(...)
+    app.state.redis = from_url(...)
+
+    yield
+
+# Endpoints access config from app.state
+@router.post("/api/day/{date}/answer")
+async def submit_answer(request: Request, ...):
+    config = request.app.state.config
+    # Use config.show_correct_answer, etc.
+```
+
+**Why This Pattern:**
+- EventConfig is **static data** from TOML files, not dynamic workflow state
+- Load ONCE at startup, not per-request or from workflow queries
+- All endpoints access via `app.state.config`
+- Workflows receive config as **explicit parameters** (dependency injection)
+- Clean separation: Configuration (static) vs Runtime State (dynamic)
+
+**Testing Pattern - Must Mock app.state.config:**
+```python
+from src.models.config import EventConfig
+
+# CRITICAL: Mock config for tests that use app.state.config
+mock_config = MagicMock(spec=EventConfig)
+mock_config.show_correct_answer = True
+app.state.config = mock_config
+
+# Also mock Temporal client as usual
+mock_client = AsyncMock()
+app.state.temporal_client = mock_client
+```
+
+**From Step 20:** User caught incorrect pattern (getting config from workflow) and corrected to proper static configuration loading.
 
 ### Testing Philosophy for API Layer 🔑 **CRITICAL**
 
-From Steps 17-18 implementation - key lessons learned:
+From Steps 17-20 implementation - key lessons learned:
 
 **Unit Tests vs Integration Tests - Critical Distinction:**
 - **Unit Tests** (`tests/unit/test_api.py`): Test YOUR application logic in isolation

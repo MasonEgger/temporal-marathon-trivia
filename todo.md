@@ -177,12 +177,14 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 20: API Routes - Submit Answer
-- [ ] Write submit answer endpoint tests
-- [ ] Implement POST /api/day/{date}/answer endpoint
-- [ ] Create completion.html and answer-feedback.html templates
-- [ ] Add score submission to DailyWorkflow
-- [ ] Refactor with error handling
-- [ ] Verify tests pass and run just check
+- [x] Write submit answer endpoint tests (7 tests)
+- [x] Implement POST /api/day/{date}/answer endpoint
+- [x] Create completion.html template (answer feedback integrated in question.html)
+- [x] Load EventConfig at API startup (lifespan context manager)
+- [x] Use config.show_correct_answer from app.state in endpoint
+- [ ] Add score submission to DailyWorkflow (DEFERRED - requires event coordination)
+- [x] Refactor with error handling
+- [x] Verify tests pass and run just check (140 tests, 92.57% coverage)
 
 ### Step 21: API Routes - Leaderboard
 - [ ] Write leaderboard endpoint tests with Redis caching
@@ -330,11 +332,11 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
 **Phase 3: Workflow Implementation** - 8/8 steps complete (100%) ✅
-**Phase 4: API Layer** - 3/6 steps complete (50.0%)
+**Phase 4: API Layer** - 4/6 steps complete (66.7%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 19/35 steps complete (54.3%)**
+**Total Progress: 20/35 steps complete (57.1%)**
 
 ---
 

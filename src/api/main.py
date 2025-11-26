@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from redis.asyncio import from_url
 from temporalio.client import Client
 
+from src.activities.config import ConfigActivities
 from src.api.routes import gameplay, player
 
 
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Lifespan context manager for FastAPI application.
 
     Handles startup and shutdown of external connections:
+    - Load EventConfig from TOML file
     - Temporal client connection
     - Redis connection
 
@@ -26,6 +28,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     Yields:
         None (app runs with connections active)
     """
+    # Startup: Load EventConfig from TOML file
+    config_path = os.getenv("EVENT_CONFIG_PATH", "config/event.toml")
+    config_activities = ConfigActivities()
+    app.state.config = config_activities.load_event_config(config_path)
+
     # Startup: Connect to Temporal
     temporal_address = os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
     temporal_namespace = os.getenv("TEMPORAL_NAMESPACE", "default")

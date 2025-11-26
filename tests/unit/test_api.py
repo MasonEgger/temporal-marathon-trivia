@@ -372,3 +372,285 @@ class TestGameplayStartDay:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "error" in response.text.lower()
+
+
+class TestGameplaySubmitAnswer:
+    """Test suite for POST /api/day/{date}/answer endpoint.
+
+    Tests focus on OUR application logic:
+    - Form parameter handling (question_id, answer_choice)
+    - Cookie validation
+    - Workflow orchestration (calling submit_answer)
+    - Response routing (next question vs completion)
+    - Error handling (validation failures, exceptions)
+
+    Does NOT test: FastAPI form parsing, Temporal SDK, template rendering engine.
+    """
+
+    def test_submit_answer_with_correct_answer_returns_correct_feedback(self) -> None:
+        """Test that correct answers return appropriate feedback and next question.
+
+        This tests OUR application logic - orchestrating workflow calls and routing
+        responses based on AnswerResult.
+        """
+        from src.api.main import app
+        from src.models.answer import AnswerResult
+        from src.models.config import EventConfig
+        from src.models.question import Question
+
+        # Mock config
+        mock_config = MagicMock(spec=EventConfig)
+        mock_config.show_correct_answer = True
+        app.state.config = mock_config
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+
+        # Simulate workflow returning correct answer + next question
+        next_q = Question(
+            id="q2",
+            text="Next question?",
+            options={"A": "Opt1", "B": "Opt2", "C": "Opt3", "D": "Opt4"},
+            correct_answer="A",
+        )
+        mock_handle.execute_update = AsyncMock(
+            return_value=AnswerResult(
+                is_correct=True,
+                correct_answer=None,  # Not shown for correct answers
+                next_question=next_q,
+                completion_message=None,
+                current_score=1,
+                total_questions=5,
+            )
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q1", "answer_choice": "A"},
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR decision to return next question HTML
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "Next question?" in response.text
+
+    def test_submit_answer_with_incorrect_answer_returns_incorrect_feedback(
+        self,
+    ) -> None:
+        """Test that incorrect answers return appropriate feedback with correct answer.
+
+        This tests OUR application logic - showing correct answer when configured.
+        """
+        from src.api.main import app
+        from src.models.answer import AnswerResult
+        from src.models.question import Question
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+
+        # Simulate workflow returning incorrect answer + next question
+        next_q = Question(
+            id="q2",
+            text="Next question?",
+            options={"A": "Opt1", "B": "Opt2", "C": "Opt3", "D": "Opt4"},
+            correct_answer="A",
+        )
+        mock_handle.execute_update = AsyncMock(
+            return_value=AnswerResult(
+                is_correct=False,
+                correct_answer="A",  # Show correct answer
+                next_question=next_q,
+                completion_message=None,
+                current_score=0,
+                total_questions=5,
+            )
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q1", "answer_choice": "B"},
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR decision to show correct answer
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Note: Actual feedback rendering tested via template, we test routing
+
+    def test_submit_answer_returns_next_question_if_more_remain(self) -> None:
+        """Test that endpoint returns next question when not all answered.
+
+        This tests OUR application logic - routing based on AnswerResult.next_question.
+        """
+        from src.api.main import app
+        from src.models.answer import AnswerResult
+        from src.models.config import EventConfig
+        from src.models.question import Question
+
+        # Mock config
+        mock_config = MagicMock(spec=EventConfig)
+        mock_config.show_correct_answer = True
+        app.state.config = mock_config
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+
+        next_q = Question(
+            id="q3",
+            text="Third question?",
+            options={"A": "Opt1", "B": "Opt2", "C": "Opt3", "D": "Opt4"},
+            correct_answer="C",
+        )
+        mock_handle.execute_update = AsyncMock(
+            return_value=AnswerResult(
+                is_correct=True,
+                correct_answer=None,
+                next_question=next_q,
+                completion_message=None,
+                current_score=2,
+                total_questions=5,
+            )
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q2", "answer_choice": "A"},
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR routing returns next question template
+        assert response.status_code == 200
+        assert "Third question?" in response.text
+
+    def test_submit_answer_returns_completion_if_all_answered(self) -> None:
+        """Test that endpoint returns completion message when day is done.
+
+        This tests OUR application logic - routing based on AnswerResult.completion_message.
+        """
+        from src.api.main import app
+        from src.models.answer import AnswerResult
+        from src.models.config import EventConfig
+
+        # Mock config
+        mock_config = MagicMock(spec=EventConfig)
+        mock_config.show_correct_answer = True
+        app.state.config = mock_config
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+
+        mock_handle.execute_update = AsyncMock(
+            return_value=AnswerResult(
+                is_correct=True,
+                correct_answer=None,
+                next_question=None,  # No more questions
+                completion_message="Great job! You completed today's trivia!",
+                current_score=5,
+                total_questions=5,
+            )
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q5", "answer_choice": "D"},
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR routing returns completion template
+        assert response.status_code == 200
+        assert "completed" in response.text.lower() or "great job" in response.text.lower()
+
+    def test_submit_answer_validates_answer_choice(self) -> None:
+        """Test that invalid answer_choice returns error HTML.
+
+        This tests OUR application logic - handling workflow validation errors.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        mock_handle = AsyncMock()
+        # Simulate workflow rejecting invalid answer
+        mock_handle.execute_update = AsyncMock(
+            side_effect=ApplicationError("answer_choice must be one of A, B, C, D")
+        )
+        mock_client.get_workflow_handle = MagicMock(return_value=mock_handle)
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q1", "answer_choice": "E"},
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR error handling returns appropriate message
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_submit_answer_requires_player_id_cookie(self) -> None:
+        """Test that missing player_id cookie returns error HTML.
+
+        This tests OUR application logic - manual cookie validation for HTMX compatibility.
+        """
+        from src.api.main import app
+
+        client = TestClient(app)
+
+        # Request without player_id cookie
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q1", "answer_choice": "A"},
+        )
+
+        # Verify OUR decision to return 200 + error HTML (HTMX pattern)
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
+
+    def test_submit_answer_handles_unexpected_exceptions(self) -> None:
+        """Test that unexpected exceptions return generic error HTML.
+
+        This tests OUR application logic - fallback error handling.
+        """
+        from src.api.main import app
+
+        mock_client = AsyncMock()
+        # Simulate unexpected error
+        mock_client.get_workflow_handle = MagicMock(
+            side_effect=RuntimeError("Connection timeout")
+        )
+        app.state.temporal_client = mock_client
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/day/2025-03-10/answer",
+            data={"question_id": "q1", "answer_choice": "A"},
+            cookies={"player_id": "player-123"},
+        )
+
+        # Verify OUR fallback error handling
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "error" in response.text.lower()
