@@ -433,9 +433,7 @@ class TestQuestionsActivities:
 
         from src.activities.questions import QuestionsActivities
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(
                 """
 {
@@ -470,9 +468,7 @@ class TestQuestionsActivities:
 
         from src.activities.questions import QuestionsActivities
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(
                 """
 {
@@ -498,9 +494,7 @@ class TestQuestionsActivities:
             activity_env = ActivityEnvironment()
             activities = QuestionsActivities()
 
-            with pytest.raises(
-                ValueError, match="correct_answer must be one of"
-            ):
+            with pytest.raises(ValueError, match="correct_answer must be one of"):
                 activity_env.run(activities.load_questions, temp_path)
         finally:
             Path(temp_path).unlink()
@@ -537,9 +531,7 @@ class TestQuestionsActivities:
 
         activity_env = ActivityEnvironment()
         activities = QuestionsActivities()
-        result = activity_env.run(
-            activities.get_questions_for_day, questions_path, "2025-03-10"
-        )
+        result = activity_env.run(activities.get_questions_for_day, questions_path, "2025-03-10")
 
         # Should return list of 5 questions for day 1
         assert isinstance(result, list)
@@ -557,9 +549,7 @@ class TestQuestionsActivities:
         activities = QuestionsActivities()
 
         with pytest.raises(KeyError, match="Date.*not found in questions file"):
-            activity_env.run(
-                activities.get_questions_for_day, questions_path, "2025-03-99"
-            )
+            activity_env.run(activities.get_questions_for_day, questions_path, "2025-03-99")
 
     def test_validate_questions_file_succeeds_for_valid_file(self) -> None:
         """Test that validate_questions_file() succeeds for valid file."""
@@ -587,9 +577,7 @@ class TestQuestionsActivities:
 
         from src.activities.questions import QuestionsActivities
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(
                 """
 {
@@ -613,9 +601,7 @@ class TestQuestionsActivities:
 
             activity_env = ActivityEnvironment()
             config_activities = ConfigActivities()
-            config = activity_env.run(
-                config_activities.load_event_config, config_path
-            )
+            config = activity_env.run(config_activities.load_event_config, config_path)
 
             activities = QuestionsActivities()
 
@@ -631,9 +617,7 @@ class TestQuestionsActivities:
 
         from src.activities.questions import QuestionsActivities
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(
                 """
 {
@@ -679,15 +663,11 @@ class TestQuestionsActivities:
 
             activity_env = ActivityEnvironment()
             config_activities = ConfigActivities()
-            config = activity_env.run(
-                config_activities.load_event_config, config_path
-            )
+            config = activity_env.run(config_activities.load_event_config, config_path)
 
             activities = QuestionsActivities()
 
-            with pytest.raises(
-                ValueError, match="Date.*has.*questions, expected"
-            ):
+            with pytest.raises(ValueError, match="Date.*has.*questions, expected"):
                 activity_env.run(activities.validate_questions_file, temp_path, config)
         finally:
             Path(temp_path).unlink()
@@ -722,9 +702,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "john.doe@company.com", True
-        )
+        result = activity_env.run(activities.validate_email, "john.doe@company.com", True)
 
         assert result is True
 
@@ -738,9 +716,7 @@ class TestEmailActivities:
         activities = EmailActivities()
 
         # Gmail should be valid when not requiring work email
-        result = activity_env.run(
-            activities.validate_email, "user@gmail.com", False
-        )
+        result = activity_env.run(activities.validate_email, "user@gmail.com", False)
         assert result is True
 
     def test_validate_email_returns_false_for_invalid_email_format(self) -> None:
@@ -749,9 +725,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "not-an-email", True
-        )
+        result = activity_env.run(activities.validate_email, "not-an-email", True)
 
         assert result is False
 
@@ -763,9 +737,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "user@gmail.com", True
-        )
+        result = activity_env.run(activities.validate_email, "user@gmail.com", True)
 
         assert result is False
 
@@ -777,9 +749,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "user@yahoo.com", True
-        )
+        result = activity_env.run(activities.validate_email, "user@yahoo.com", True)
 
         assert result is False
 
@@ -791,9 +761,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "user@hotmail.com", True
-        )
+        result = activity_env.run(activities.validate_email, "user@hotmail.com", True)
 
         assert result is False
 
@@ -805,9 +773,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "user@outlook.com", True
-        )
+        result = activity_env.run(activities.validate_email, "user@outlook.com", True)
 
         assert result is False
 
@@ -819,9 +785,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "user@aol.com", True
-        )
+        result = activity_env.run(activities.validate_email, "user@aol.com", True)
 
         assert result is False
 
@@ -833,9 +797,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "user@icloud.com", True
-        )
+        result = activity_env.run(activities.validate_email, "user@icloud.com", True)
 
         assert result is False
 
@@ -845,9 +807,7 @@ class TestEmailActivities:
 
         activity_env = ActivityEnvironment()
         activities = EmailActivities()
-        result = activity_env.run(
-            activities.validate_email, "", True
-        )
+        result = activity_env.run(activities.validate_email, "", True)
 
         assert result is False
 
@@ -1107,7 +1067,9 @@ class TestExportActivities:
             )
 
             # Verify S3 URL format
-            expected_url = "https://test-bucket.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
+            expected_url = (
+                "https://test-bucket.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
+            )
             assert result == expected_url
 
     def test_export_daily_csv_to_s3_handles_empty_player_list(self) -> None:

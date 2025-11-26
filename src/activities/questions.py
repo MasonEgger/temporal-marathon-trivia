@@ -39,8 +39,7 @@ class QuestionsActivities:
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(
-                f"Questions file not found: {file_path}. "
-                "Please verify the file path is correct."
+                f"Questions file not found: {file_path}. Please verify the file path is correct."
             )
 
         # Read and parse JSON
@@ -61,9 +60,7 @@ class QuestionsActivities:
                 questions = [Question(**q) for q in question_dicts]
                 result[date_key] = questions
         except Exception as e:
-            raise ValueError(
-                f"Failed to validate question data in '{file_path}': {e}"
-            ) from e
+            raise ValueError(f"Failed to validate question data in '{file_path}': {e}") from e
 
         return result
 
@@ -103,9 +100,7 @@ class QuestionsActivities:
         return all_questions[date]
 
     @activity.defn
-    def validate_questions_file(
-        self, file_path: str, config: EventConfig
-    ) -> None:
+    def validate_questions_file(self, file_path: str, config: EventConfig) -> None:
         """Validate questions file against event configuration.
 
         Ensures that:

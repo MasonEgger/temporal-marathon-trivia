@@ -66,8 +66,7 @@ class Question:
                 error_parts.append(f"extra keys: {sorted(extra)}")
 
             raise ValueError(
-                f"options must have exactly keys A, B, C, D. "
-                f"Found issues: {', '.join(error_parts)}"
+                f"options must have exactly keys A, B, C, D. Found issues: {', '.join(error_parts)}"
             )
 
         return self
@@ -79,8 +78,7 @@ class Question:
 
         if self.correct_answer not in valid_answers:
             raise ValueError(
-                f"correct_answer must be one of A, B, C, D. "
-                f"Got: {self.correct_answer!r}"
+                f"correct_answer must be one of A, B, C, D. Got: {self.correct_answer!r}"
             )
 
         if self.correct_answer not in self.options:

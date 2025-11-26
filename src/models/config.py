@@ -81,18 +81,14 @@ class EventConfig:
         try:
             ZoneInfo(self.timezone)
         except Exception as e:
-            raise ValueError(
-                f"Invalid timezone '{self.timezone}': {e}"
-            ) from e
+            raise ValueError(f"Invalid timezone '{self.timezone}': {e}") from e
         return self
 
     @model_validator(mode="after")
     def validate_questions_per_day(self) -> EventConfig:
         """Validate that questions_per_day is positive."""
         if self.questions_per_day <= 0:
-            raise ValueError(
-                f"questions_per_day must be positive, got {self.questions_per_day}"
-            )
+            raise ValueError(f"questions_per_day must be positive, got {self.questions_per_day}")
         return self
 
     def get_all_dates(self) -> list[date]:

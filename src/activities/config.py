@@ -41,77 +41,55 @@ class ConfigActivities:
         # Check if file exists
         config_file = Path(config_path)
         if not config_file.exists():
-            raise FileNotFoundError(
-                f"Configuration file not found: {config_path}"
-            )
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
         # Read and parse TOML file
         try:
             with open(config_file, "rb") as f:
                 data = tomllib.load(f)
         except tomllib.TOMLDecodeError as e:
-            raise ValueError(
-                f"Failed to parse TOML configuration file: {e}"
-            ) from e
+            raise ValueError(f"Failed to parse TOML configuration file: {e}") from e
         except Exception as e:
-            raise ValueError(
-                f"Error reading configuration file: {e}"
-            ) from e
+            raise ValueError(f"Error reading configuration file: {e}") from e
 
         # Extract sections - provide helpful error messages for missing sections
         try:
             dates_section = data["dates"]
         except KeyError as e:
-            raise ValueError(
-                "Missing required section '[dates]' in configuration file"
-            ) from e
+            raise ValueError("Missing required section '[dates]' in configuration file") from e
 
         try:
             questions_section = data["questions"]
         except KeyError as e:
-            raise ValueError(
-                "Missing required section '[questions]' in configuration file"
-            ) from e
+            raise ValueError("Missing required section '[questions]' in configuration file") from e
 
         try:
             features_section = data["features"]
         except KeyError as e:
-            raise ValueError(
-                "Missing required section '[features]' in configuration file"
-            ) from e
+            raise ValueError("Missing required section '[features]' in configuration file") from e
 
         try:
             s3_section = data["s3"]
         except KeyError as e:
-            raise ValueError(
-                "Missing required section '[s3]' in configuration file"
-            ) from e
+            raise ValueError("Missing required section '[s3]' in configuration file") from e
 
         # Parse date strings to date objects (ISO format: YYYY-MM-DD)
         try:
             start_date = date.fromisoformat(dates_section["start_date"])
             end_date = date.fromisoformat(dates_section["end_date"])
         except KeyError as e:
-            raise ValueError(
-                f"Missing required date field in [dates] section: {e}"
-            ) from e
+            raise ValueError(f"Missing required date field in [dates] section: {e}") from e
         except ValueError as e:
-            raise ValueError(
-                f"Invalid date format (expected YYYY-MM-DD): {e}"
-            ) from e
+            raise ValueError(f"Invalid date format (expected YYYY-MM-DD): {e}") from e
 
         # Parse time strings to time objects (ISO format: HH:MM:SS)
         try:
             day_start_time = time.fromisoformat(dates_section["day_start_time"])
             day_end_time = time.fromisoformat(dates_section["day_end_time"])
         except KeyError as e:
-            raise ValueError(
-                f"Missing required time field in [dates] section: {e}"
-            ) from e
+            raise ValueError(f"Missing required time field in [dates] section: {e}") from e
         except ValueError as e:
-            raise ValueError(
-                f"Invalid time format (expected HH:MM:SS): {e}"
-            ) from e
+            raise ValueError(f"Invalid time format (expected HH:MM:SS): {e}") from e
 
         # Create and return EventConfig instance
         # Pydantic validation will handle field validation

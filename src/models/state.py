@@ -47,6 +47,7 @@ class DailyState:
         questions: List of Question objects for this day.
         player_scores: Mapping of player_id to their score for this day.
         completed_players: Set of player_ids who have completed this day.
+        player_info: Mapping of player_id to tuple of (email, first_name, last_name).
         config: Event configuration with timing and settings.
 
     Example:
@@ -80,4 +81,5 @@ class DailyState:
     questions: list[Question]
     player_scores: dict[str, int] = field(default_factory=dict)
     completed_players: set[str] = field(default_factory=set)
+    player_info: dict[str, tuple[str, str, str]] = field(default_factory=dict)
     config: EventConfig | None = None

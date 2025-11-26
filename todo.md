@@ -115,14 +115,14 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 - [x] Verify tests pass and run just check
 
 ### Step 13: DailyWorkflow - Leaderboard Ranking Logic
-- [ ] Write leaderboard ranking tests (sorting, ties, alphabetical tie-breaking)
-- [ ] Create calculate_leaderboard() helper function
-- [ ] Implement get_daily_leaderboard() query
-- [ ] Write submit_score update handler tests
-- [ ] Implement submit_score update handler
-- [ ] Make submit_score tests pass
-- [ ] Refactor ranking logic if needed
-- [ ] Verify tests pass and run just check
+- [x] Write leaderboard ranking tests (sorting, ties, alphabetical tie-breaking)
+- [x] Create calculate_leaderboard() helper function
+- [x] Implement get_daily_leaderboard() query
+- [x] Write submit_score update handler tests
+- [x] Implement submit_score update handler
+- [x] Make submit_score tests pass
+- [x] Refactor ranking logic if needed
+- [x] Verify tests pass and run just check
 
 ### Step 14: EventWorkflow - Basic Structure
 - [ ] Write EventWorkflow initialization tests
@@ -329,12 +329,12 @@ This file tracks the implementation progress of the Marathon Trivia Platform. Ea
 
 **Phase 1: Project Foundation** - 4/4 steps complete (100%) ✅
 **Phase 2: Configuration and Question Loading** - 4/4 steps complete (100%) ✅
-**Phase 3: Workflow Implementation** - 4/8 steps complete (50%)
+**Phase 3: Workflow Implementation** - 5/8 steps complete (62.5%)
 **Phase 4: API Layer** - 0/6 steps complete (0%)
 **Phase 5: Frontend and Integration** - 0/5 steps complete (0%)
 **Phase 6: Deployment and Documentation** - 0/8 steps complete (0%)
 
-**Total Progress: 12/35 steps complete (34.3%)**
+**Total Progress: 13/35 steps complete (37.1%)**
 
 ---
 

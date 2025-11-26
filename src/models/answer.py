@@ -1,5 +1,5 @@
-# ABOUTME: Answer-related models for submit_answer update handler.
-# Contains request/response models for answer submission with type safety.
+# ABOUTME: Request/response models for workflow update handlers.
+# Contains models for answer submission and score submission with type safety.
 
 from dataclasses import dataclass
 
@@ -80,3 +80,37 @@ class AnswerResult:
     completion_message: str | None
     current_score: int
     total_questions: int
+
+
+@dataclass
+class SubmitScoreRequest:
+    """Request model for submit_score update handler in DailyWorkflow.
+
+    Encapsulates all parameters needed to submit a player's score for a day,
+    maintaining type safety when passing to workflow update handlers.
+
+    Attributes:
+        player_id: Unique identifier for the player
+        score: The score achieved by the player for this day
+        email: Player's email address
+        first_name: Player's first name
+        last_name: Player's last name
+
+    Example:
+        >>> request = SubmitScoreRequest(
+        ...     player_id="player-123",
+        ...     score=8,
+        ...     email="alice@example.com",
+        ...     first_name="Alice",
+        ...     last_name="Smith"
+        ... )
+        >>> await handle.execute_update(
+        ...     DailyWorkflow.submit_score, request
+        ... )
+    """
+
+    player_id: str
+    score: int
+    email: str
+    first_name: str
+    last_name: str

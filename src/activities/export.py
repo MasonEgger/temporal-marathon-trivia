@@ -57,7 +57,7 @@ class ExportActivities:
         csv_writer = csv.writer(csv_buffer)
 
         # Build header row with dynamic day columns
-        day_columns = [f"day{i+1}_score" for i in range(len(event_dates))]
+        day_columns = [f"day{i + 1}_score" for i in range(len(event_dates))]
         header = ["email", "first_name", "last_name", "total_score"]
         header.extend(day_columns)
         header.append("completed_days")

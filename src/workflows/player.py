@@ -32,9 +32,7 @@ class PlayerEntityWorkflow:
         self.state: PlayerState | None = None
 
     @workflow.run
-    async def run(
-        self, player_id: str, email: str, first_name: str, last_name: str
-    ) -> None:
+    async def run(self, player_id: str, email: str, first_name: str, last_name: str) -> None:
         """Run method initializes player state and waits indefinitely.
 
         Args:
@@ -60,9 +58,7 @@ class PlayerEntityWorkflow:
         )
 
         # Initialize workflow state
-        self.state = PlayerState(
-            player=player, current_day=None, current_question_index=0
-        )
+        self.state = PlayerState(player=player, current_day=None, current_question_index=0)
 
         # Keep workflow running indefinitely
         await workflow.wait_condition(lambda: False)
@@ -259,9 +255,7 @@ class PlayerEntityWorkflow:
 
         # Get current score and total questions
         current_score = self.state.player.daily_scores.get(request.date, 0)
-        total_questions = (
-            len(self.state.current_questions) if self.state.current_questions else 0
-        )
+        total_questions = len(self.state.current_questions) if self.state.current_questions else 0
 
         # Increment question index
         self.state.current_question_index += 1
@@ -286,9 +280,7 @@ class PlayerEntityWorkflow:
         else:
             # All questions answered - mark day as completed
             self.state.player.completed_days.add(request.date)
-            completion_message = (
-                f"Day complete! You scored {current_score}/{total_questions}."
-            )
+            completion_message = f"Day complete! You scored {current_score}/{total_questions}."
             return AnswerResult(
                 is_correct=is_correct,
                 correct_answer=(

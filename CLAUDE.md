@@ -309,10 +309,10 @@ This project follows a strict **35-step TDD implementation plan**:
 - **todo.md**: Progress tracking with checkboxes and completion percentages
 - **.ai-sessions/**: Session summaries documenting progress and learnings
 
-**Current Status**: Phase 3 in progress - 12/35 steps complete (34.3% total progress)
+**Current Status**: Phase 3 in progress - 13/35 steps complete (37.1% total progress)
 - Phase 1 (Project Foundation): 100% complete ✅
 - Phase 2 (Configuration and Question Loading): 100% complete ✅
-- Phase 3 (Workflow Implementation): 50% complete (4/8 steps)
+- Phase 3 (Workflow Implementation): 62.5% complete (5/8 steps)
 
 When working on this project:
 1. Read the appropriate step in `plan.md` for detailed instructions
@@ -744,17 +744,25 @@ Before writing a workflow test:
 - **Coverage**: 89.16% (83 statements, 9 missed)
 
 ### DailyWorkflow (`src/workflows/daily.py`)
-- **Status**: BASIC STRUCTURE COMPLETE - Step 12 ✅
+- **Status**: COMPLETE - Leaderboard ranking implemented (Steps 12-13) ✅
 - **Pattern**: Entity workflow (runs indefinitely for one day)
-- **State**: DailyState with date, questions, player_scores, completed_players, config
+- **State**: DailyState with date, questions, player_scores, completed_players, player_info, config
 - **Run method**: Initializes state, runs indefinitely with `workflow.wait_condition(lambda: False)`
 - **Queries implemented**:
-  - `get_daily_leaderboard() -> list[LeaderboardEntry]` - Returns empty list (Step 13 will implement ranking)
+  - `get_daily_leaderboard() -> list[LeaderboardEntry]` - Returns ranked leaderboard with tie handling and alphabetical sorting
   - `is_day_active() -> bool` - Time-based check using `workflow.now()`
-- **Update handlers**: None yet (Step 13 will add submit_score)
-- **Testing**: 6 comprehensive tests with pydantic_data_converter
-- **Coverage**: 89.66% (29 statements, 3 missed)
-- **Next steps**: Implement leaderboard ranking logic (Step 13)
+- **Update handlers implemented**:
+  - `submit_score(request: SubmitScoreRequest) -> None` - Stores player score and marks as completed
+  - `validate_submit_score(request: SubmitScoreRequest) -> None` - Validator preventing duplicate submissions
+- **Helper functions**:
+  - `calculate_leaderboard(player_scores, player_info) -> list[LeaderboardEntry]` - Ranking algorithm with tie handling
+- **Testing**: 11 comprehensive tests with pydantic_data_converter (6 basic + 5 leaderboard ranking)
+- **Coverage**: 91.80% (61 statements, 5 missed)
+- **Key Features**:
+  - Tied players share same rank (5 at rank 1 → next is rank 6)
+  - Alphabetical tie-breaking by last name, then first name
+  - Display names in "FirstName L." format
+  - Temporal update validator prevents duplicate score submissions
 
 ### Workflow State Models (`src/models/state.py`)
 - **Purpose**: Consolidated file for all workflow state dataclasses
@@ -762,8 +770,8 @@ Before writing a workflow test:
   - Fields: player (Player), current_day (str | None), current_question_index (int), current_questions (list[Question] | None)
   - Design: Combines business data with workflow-specific state. Stores only current day's questions (not all days) for efficiency.
 - **DailyState**: Workflow state for DailyWorkflow
-  - Fields: date (str), questions (list[Question]), player_scores (dict[str, int]), completed_players (set[str]), config (EventConfig | None)
-  - Design: Manages daily leaderboard state with player scores and completion tracking
+  - Fields: date (str), questions (list[Question]), player_scores (dict[str, int]), completed_players (set[str]), player_info (dict[str, tuple[str, str, str]]), config (EventConfig | None)
+  - Design: Manages daily leaderboard state with player scores, completion tracking, and player identity for ranking
 - **Coverage**: 100% (14 statements, 0 missed)
 - **Design Pattern**: All workflow state models consolidated in single file for better organization
 
@@ -892,7 +900,35 @@ This project reuses patterns from:
    - Pattern from samples-python safe_message_handlers
    - Do NOT use `pytest.raises(Exception)` or check `exc_info.value` directly
 
-7. **Type-Safe Request/Response Models** 🔑
+7. **Temporal Update Validators** 🔑🔑 **CRITICAL**
+   ```python
+   # Validators prevent bad updates from being written to workflow history
+   @workflow.update
+   def submit_score(self, request: SubmitScoreRequest) -> None:
+       """Update handler mutates state - assumes validator passed."""
+       # No need for defensive state checks - validator ensures preconditions
+       self.state.player_scores[request.player_id] = request.score
+       self.state.completed_players.add(request.player_id)
+
+   @submit_score.validator
+   def validate_submit_score(self, request: SubmitScoreRequest) -> None:
+       """Validator checks preconditions before update is written to history."""
+       if self.state is None:
+           raise ValueError("Workflow state not initialized")
+       if request.player_id in self.state.completed_players:
+           raise ValueError(f"Player already submitted score")
+       # Raise ANY exception to reject - not just ApplicationError
+   ```
+   - **Use `@<update_name>.validator` decorator** to validate before execution
+   - Validators run BEFORE update is written to workflow event history
+   - Raise **any exception** to reject (ValueError, RuntimeError, etc. - not just ApplicationError)
+   - If validator passes, update handler executes and mutates state
+   - **Benefits**: Clean separation (validation vs mutation), prevents bad updates from polluting history
+   - **When to use**: Checking preconditions, detecting duplicates, validating business rules
+   - **Update handler**: Can skip redundant checks since validator guarantees preconditions
+   - Docs: https://docs.temporal.io/develop/python/message-passing#updates
+
+8. **Type-Safe Request/Response Models** 🔑
    ```python
    # src/models/answer.py
    @dataclass

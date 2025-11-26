@@ -11,7 +11,7 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from src.models.answer import AnswerResult, SubmitAnswerRequest
+from src.models.answer import AnswerResult, SubmitAnswerRequest, SubmitScoreRequest
 from src.models.config import EventConfig
 from src.models.question import Question
 from src.models.state import PlayerState
@@ -210,9 +210,7 @@ class TestPlayerEntityWorkflow:
                     task_queue="test-queue",
                 )
                 # Score for any day should be 0 initially
-                score = await handle.query(
-                    PlayerEntityWorkflow.get_score_for_day, "2025-03-10"
-                )
+                score = await handle.query(PlayerEntityWorkflow.get_score_for_day, "2025-03-10")
                 assert score == 0
 
     @pytest.mark.asyncio
@@ -238,9 +236,7 @@ class TestPlayerEntityWorkflow:
                     task_queue="test-queue",
                 )
                 # No days should be completed initially
-                completed = await handle.query(
-                    PlayerEntityWorkflow.has_completed_day, "2025-03-10"
-                )
+                completed = await handle.query(PlayerEntityWorkflow.has_completed_day, "2025-03-10")
                 assert completed is False
 
 
@@ -270,9 +266,7 @@ class TestPlayerEntityWorkflowStartDay:
                 )
 
                 # Call start_day update handler
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+                result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
                 # Should return first question
                 assert isinstance(result, Question)
@@ -402,9 +396,7 @@ class TestPlayerEntityWorkflowStartDay:
                 )
 
                 # Call start_day - if activity isn't called, this will fail
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+                result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
                 # If we get a result, activity was called successfully
                 assert result is not None
@@ -432,9 +424,7 @@ class TestPlayerEntityWorkflowStartDay:
                 )
 
                 # Call start_day
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.start_day, "2025-03-10"
-                )
+                result = await handle.execute_update(PlayerEntityWorkflow.start_day, "2025-03-10")
 
                 # Verify Question structure
                 assert isinstance(result, Question)
@@ -481,9 +471,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
                     answer_choice="B",  # correct
                     show_correct_answer=False,
                 )
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.submit_answer, request
-                )
+                result = await handle.execute_update(PlayerEntityWorkflow.submit_answer, request)
 
                 # Verify result
                 assert isinstance(result, AnswerResult)
@@ -526,9 +514,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
                     answer_choice="A",  # incorrect
                     show_correct_answer=False,
                 )
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.submit_answer, request
-                )
+                result = await handle.execute_update(PlayerEntityWorkflow.submit_answer, request)
 
                 # Verify result
                 assert isinstance(result, AnswerResult)
@@ -571,9 +557,7 @@ class TestPlayerEntityWorkflowSubmitAnswer:
                     answer_choice="B",
                     show_correct_answer=False,
                 )
-                result = await handle.execute_update(
-                    PlayerEntityWorkflow.submit_answer, request
-                )
+                result = await handle.execute_update(PlayerEntityWorkflow.submit_answer, request)
 
                 # Should return next question (q2)
                 assert result.next_question is not None
@@ -1026,3 +1010,232 @@ class TestDailyWorkflow:
                 is_active = await handle.query(DailyWorkflow.is_day_active)
                 # Will be True if current workflow time is between 9AM and 5PM
                 assert isinstance(is_active, bool)
+
+    @pytest.mark.asyncio
+    async def test_get_daily_leaderboard_returns_entries_sorted_by_score_descending(
+        self,
+    ) -> None:
+        """Test that get_daily_leaderboard returns entries sorted by score descending."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Submit scores for 3 players with different scores
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-1", 5, "alice@example.com", "Alice", "Smith"),
+                )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-2", 8, "bob@example.com", "Bob", "Johnson"),
+                )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-3", 3, "charlie@example.com", "Charlie", "Williams"),
+                )
+
+                # Query leaderboard
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+
+                # Should be sorted by score descending
+                assert len(leaderboard) == 3
+                assert leaderboard[0].total_score == 8  # Bob
+                assert leaderboard[1].total_score == 5  # Alice
+                assert leaderboard[2].total_score == 3  # Charlie
+
+    @pytest.mark.asyncio
+    async def test_get_daily_leaderboard_players_with_tied_scores_share_same_rank(
+        self,
+    ) -> None:
+        """Test that players with tied scores share the same rank."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Submit scores for 3 players, 2 with same score
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-1", 5, "alice@example.com", "Alice", "Smith"),
+                )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-2", 5, "bob@example.com", "Bob", "Johnson"),
+                )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-3", 3, "charlie@example.com", "Charlie", "Williams"),
+                )
+
+                # Query leaderboard
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+
+                # Both Alice and Bob should have rank 1
+                assert len(leaderboard) == 3
+                assert leaderboard[0].rank == 1
+                assert leaderboard[1].rank == 1
+                assert leaderboard[2].rank == 3  # Charlie gets rank 3, not rank 2
+
+    @pytest.mark.asyncio
+    async def test_get_daily_leaderboard_next_rank_after_tie_adjusts_correctly(
+        self,
+    ) -> None:
+        """Test that next rank after tie adjusts correctly (5 players at rank 1, next is rank 6)."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Submit scores for 6 players: 5 with score 10, 1 with score 8
+                for i in range(5):
+                    await handle.execute_update(
+                        DailyWorkflow.submit_score,
+                        SubmitScoreRequest(
+                            f"player-{i}", 10, f"player{i}@example.com", f"Player{i}", "Lastname"
+                        ),
+                    )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-5", 8, "player5@example.com", "Player5", "Lastname"),
+                )
+
+                # Query leaderboard
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+
+                # First 5 players should have rank 1
+                assert len(leaderboard) == 6
+                for i in range(5):
+                    assert leaderboard[i].rank == 1
+
+                # 6th player should have rank 6 (not rank 2)
+                assert leaderboard[5].rank == 6
+
+    @pytest.mark.asyncio
+    async def test_get_daily_leaderboard_ties_broken_alphabetically(self) -> None:
+        """Test that ties are broken alphabetically by last name, then first name."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Submit scores for 3 players with same score, different names
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-1", 5, "john@example.com", "John", "Doe"),
+                )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-2", 5, "alice@example.com", "Alice", "Brown"),
+                )
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-3", 5, "bob@example.com", "Bob", "Adams"),
+                )
+
+                # Query leaderboard
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+
+                # Should be sorted alphabetically by last name: Adams, Brown, Doe
+                assert len(leaderboard) == 3
+                assert leaderboard[0].display_name == "Bob A."  # Adams
+                assert leaderboard[1].display_name == "Alice B."  # Brown
+                assert leaderboard[2].display_name == "John D."  # Doe
+
+    @pytest.mark.asyncio
+    async def test_get_daily_leaderboard_includes_display_names_in_correct_format(
+        self,
+    ) -> None:
+        """Test that leaderboard includes display names in 'FirstName L.' format."""
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            new_config = env.client.config()
+            new_config["data_converter"] = pydantic_data_converter
+            client = Client(**new_config)
+
+            async with Worker(
+                client,
+                task_queue="test-queue",
+                workflows=[DailyWorkflow],
+            ):
+                config = create_test_event_config()
+                questions = create_test_questions()
+
+                handle = await client.start_workflow(
+                    DailyWorkflow.run,
+                    args=["2025-03-10", questions, config],
+                    id=f"test-daily-workflow-{uuid.uuid4()}",
+                    task_queue="test-queue",
+                )
+
+                # Submit score for one player
+                await handle.execute_update(
+                    DailyWorkflow.submit_score,
+                    SubmitScoreRequest("player-1", 5, "alice@example.com", "Alice", "Smith"),
+                )
+
+                # Query leaderboard
+                leaderboard = await handle.query(DailyWorkflow.get_daily_leaderboard)
+
+                # Should have display name in "FirstName L." format
+                assert len(leaderboard) == 1
+                assert leaderboard[0].display_name == "Alice S."

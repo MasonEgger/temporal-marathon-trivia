@@ -39,13 +39,13 @@ def test_export_csv_end_to_end_with_s3() -> None:
     )
 
     # Verify S3 URL is correct
-    expected_url = f"https://{bucket_name}.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
+    expected_url = (
+        f"https://{bucket_name}.s3.us-west-2.amazonaws.com/marathon-trivia-2025-03-12.csv"
+    )
     assert s3_url == expected_url
 
     # Verify S3 object exists
-    response = s3_client.get_object(
-        Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv"
-    )
+    response = s3_client.get_object(Bucket=bucket_name, Key="marathon-trivia-2025-03-12.csv")
     assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
 
     # Verify CSV content
